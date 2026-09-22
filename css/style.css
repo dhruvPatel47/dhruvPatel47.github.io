@@ -372,6 +372,52 @@ main, .nav, .footer{ position:relative; z-index:2; }
 .bp-edge{ stroke:url(#edgeGrad); stroke-width:1.6; fill:none; }
 .bp-packet{ fill:var(--cyan); filter:url(#nodeGlow); }
 
+/* project blurb + journey player */
+.bp-blurb{
+  margin:0; padding:16px 20px 0; color:var(--text-dim);
+  font-size:.93rem; max-width:74ch;
+}
+.bp-flowbar{ display:flex; align-items:center; gap:10px; padding:14px 20px 4px; flex-wrap:wrap; }
+
+.bp-play{
+  flex:none; cursor:pointer; font-family:var(--mono); font-size:.76rem; font-weight:500;
+  color:#00141c; background:linear-gradient(135deg,var(--cyan),#34d1ff);
+  border:0; border-radius:7px; padding:8px 15px;
+  box-shadow:0 0 18px -6px rgba(0,229,255,.9);
+  transition:transform .2s var(--ease), filter .2s;
+}
+.bp-play:hover{ transform:translateY(-2px); filter:brightness(1.1); }
+.bp-play.playing{ background:linear-gradient(135deg,var(--violet),#c084fc); box-shadow:0 0 18px -6px rgba(168,85,247,.9); }
+
+.bp-flow{ display:flex; gap:6px; flex-wrap:wrap; }
+.flow-step{
+  display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+  font-family:var(--mono); font-size:.72rem; color:var(--text-dim);
+  background:rgba(255,255,255,.03); border:1px solid var(--border-2);
+  border-radius:100px; padding:5px 12px 5px 5px;
+  transition:all .22s var(--ease);
+}
+.flow-step:hover{ color:var(--text); border-color:var(--border); }
+.flow-step.active{
+  color:var(--cyan); border-color:var(--cyan); background:rgba(0,229,255,.12);
+  box-shadow:0 0 16px -5px rgba(0,229,255,.85);
+}
+.fs-num{
+  flex:none; width:19px; height:19px; border-radius:50%;
+  display:grid; place-items:center; font-size:.66rem; font-weight:700;
+  background:rgba(255,255,255,.07); color:var(--text-mute);
+}
+.flow-step.active .fs-num{ background:var(--cyan); color:#00141c; }
+
+/* highlighted vs dimmed while a journey step is selected */
+.bp-node.dim{ opacity:.24; }
+.bp-node.lit rect{ stroke:var(--cyan); fill:rgba(0,229,255,.16); filter:url(#nodeGlow); }
+.bp-node, .bp-edge, .bp-packet{ transition:opacity .35s var(--ease); }
+.bp-edge.cold{ opacity:.12; }
+.bp-edge.hot{ stroke:var(--cyan); stroke-width:2.4; opacity:1; }
+.bp-packet.cold{ opacity:0; }
+.bp-packet.hot{ r:4.4; }
+
 .bp-detail{ padding:20px 24px; border-top:1px solid var(--border-2); min-height:112px; background:rgba(0,0,0,.24); }
 .bp-hint{ color:var(--text-mute); font-family:var(--mono); font-size:.83rem; margin:0; }
 .bp-detail h4{ margin:0 0 4px; font-size:1.05rem; color:var(--cyan); font-family:var(--mono); }

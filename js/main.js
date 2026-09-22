@@ -278,24 +278,65 @@
   var PROJECTS = {
     easyshop: {
       file: 'easyshop-architecture.svg',
+      blurb: 'A fully serverless e-commerce platform on AWS — browse, register, pay by card, get a receipt. ' +
+             'No servers to manage anywhere in it. Step through the flow below to follow a real request.',
       meta: [
-        ['Context', 'Seneca capstone · 2026'],
-        ['Cloud spend', 'Under $52 total'],
-        ['Availability', 'Multi-AZ, automatic failover'],
-        ['Standard', 'All six AWS Well-Architected pillars']
+        ['Region', 'us-east-2 (Ohio) · 2 AZs'],
+        ['Network', 'Custom VPC 10.0.0.0/16 · 4 subnets'],
+        ['Compute', '11 Lambda functions · Node.js 24.x'],
+        ['All-time cost', '$52.71 (Sept 2025 – Apr 2026)']
       ],
       nodes: [
-        { id: 'client',  x: 30,  y: 205, label: 'Client',       sub: 'browser',          role: 'Entry point',   desc: 'Every request arrives over HTTPS/TLS. Nothing in the stack accepts plaintext traffic.' },
-        { id: 'cf',      x: 185, y: 205, label: 'CloudFront',   sub: 'CDN · TLS',        role: 'Edge delivery', desc: 'Serves the static front end from edge locations and terminates TLS, keeping latency down and the origin private.' },
-        { id: 'apigw',   x: 350, y: 205, label: 'API Gateway',  sub: 'REST',             role: 'API layer',     desc: 'Single managed entry to the backend. Routes each REST path to its own Lambda, so one noisy endpoint cannot starve the rest.' },
-        { id: 'cognito', x: 350, y: 70,  label: 'Cognito',      sub: 'JWT auth',         role: 'Identity',      desc: 'Handles sign-up, sign-in and token issuance. API Gateway validates the JWT before a Lambda ever runs.' },
-        { id: 'stripe',  x: 545, y: 70,  label: 'Stripe',       sub: 'payments',         role: 'Integration',   desc: 'Card data never touches my infrastructure — the payment Lambda talks to Stripe directly, which keeps the compliance surface small.' },
-        { id: 'lambda',  x: 545, y: 205, label: 'Lambda × 11',  sub: 'private subnet',   role: 'Compute',       desc: 'Eleven single-purpose functions, each with its own least-privilege IAM role, running inside a private subnet with no public IP.' },
-        { id: 'rds',     x: 730, y: 130, label: 'RDS MySQL',    sub: 'Multi-AZ',         role: 'Data',          desc: 'Multi-AZ deployment with automatic failover to the standby. A lost availability zone costs a reconnect, not an outage.' },
-        { id: 'kms',     x: 730, y: 285, label: 'KMS',          sub: 'encryption',       role: 'Crypto',        desc: 'Manages the keys encrypting data at rest. Rotation is handled by AWS rather than by me remembering to do it.' },
-        { id: 'vpc',     x: 545, y: 350, label: 'VPC · 2 AZ',   sub: 'network boundary', role: 'Network',       desc: 'Custom VPC spanning two availability zones, split into public and private subnets. Compute and data sit in private subnets only.' }
+        { id: 'customer',  x: 15,  y: 240, label: 'Customer',    sub: 'browser',           role: 'Entry point',
+          desc: 'Everything starts here over HTTPS. The browser holds the cart in localStorage and the Cognito JWT that authorizes every API call.' },
+        { id: 'cloudfront',x: 165, y: 240, label: 'CloudFront',  sub: 'CDN · HTTPS',       role: 'Edge delivery',
+          desc: 'Distribution dreytiaia0vyk.cloudfront.net. Serves the front end from global edge locations, terminates TLS and absorbs DDoS traffic. Origin is S3, default root object index.html.' },
+        { id: 's3',        x: 165, y: 360, label: 'S3',          sub: 'static + images',   role: 'Storage',
+          desc: 'Bucket easyshop-frontend-uche1 holds every HTML, CSS and JS file, plus product images uploaded by the admin. All objects encrypted at rest with SSE-S3 (AES-256).' },
+        { id: 'cognito',   x: 325, y: 110, label: 'Cognito',     sub: 'user pool',         role: 'Identity',
+          desc: 'User pool us-east-2_HJXtENYkU, 13 registered users. Handles registration, email verification, SRP password hashing and JWT issuance. The application never touches a raw password.' },
+        { id: 'apigw',     x: 325, y: 240, label: 'API Gateway', sub: 'HTTP API · 10 routes', role: 'API layer',
+          desc: 'HTTP API on the dev stage, 10 routes covering product and order CRUD, Stripe checkout, email and presigned uploads. CORS is locked to the CloudFront origin.' },
+        { id: 'stripe',    x: 495, y: 45,  label: 'Stripe',      sub: 'hosted checkout',   role: 'Payments',
+          desc: 'Checkout runs on Stripe’s hosted page. Card numbers, CVV and billing details are entered on Stripe’s PCI-compliant infrastructure and never pass through my application or database.' },
+        { id: 'lambda',    x: 495, y: 240, label: 'Lambda × 11', sub: 'private subnets',   role: 'Compute',
+          desc: 'Eleven single-purpose Node.js functions — products CRUD, orders CRUD, createCheckoutSession, sendConfirmationEmail, getUploadUrl. They run in private subnets and reach the internet only through NAT gateways.' },
+        { id: 'cloudwatch',x: 495, y: 380, label: 'CloudWatch',  sub: '11 log groups',     role: 'Observability',
+          desc: 'One log group per function. Invocations, duration, memory and errors are captured automatically — full visibility with no agent to install.' },
+        { id: 'rds',       x: 680, y: 155, label: 'RDS MySQL',   sub: 'Multi-AZ · 8.4.7',  role: 'Database',
+          desc: 'MySQL 8.4.7 on db.t3.micro with a standby in a second AZ for automatic failover. Two tables, products and orders. Encrypted at rest with the aws/rds KMS key, automated backups, storage autoscaling to 1000 GiB.' },
+        { id: 'ses',       x: 680, y: 265, label: 'SES',         sub: 'order receipts',    role: 'Email',
+          desc: 'Sends the order confirmation from a verified sender identity once payment succeeds. Triggered by the sendConfirmationEmail function, not by the client.' },
+        { id: 'sns',       x: 680, y: 375, label: 'SNS',         sub: 'order topic',       role: 'Messaging',
+          desc: 'Topic EasyShop-OrderTopic with a confirmed email subscription — the hook for order broadcasting and future alerting.' }
       ],
-      edges: [['client','cf'],['cf','apigw'],['apigw','cognito'],['apigw','lambda'],['lambda','stripe'],['lambda','rds'],['lambda','kms'],['lambda','vpc']]
+      edges: [
+        ['customer','cloudfront'],['cloudfront','s3'],['cloudfront','apigw'],['cloudfront','cognito'],
+        ['cognito','apigw'],['apigw','lambda'],['lambda','rds'],['lambda','stripe'],['lambda','ses'],
+        ['lambda','sns'],['lambda','cloudwatch'],['lambda','s3'],['customer','stripe']
+      ],
+      flows: [
+        { title: 'Browse the shop', path: ['customer','cloudfront','s3'],
+          desc: 'The customer opens the site. CloudFront serves the static front end from the S3 bucket out of the nearest edge location, over HTTPS.' },
+        { title: 'Register', path: ['customer','cloudfront','cognito'],
+          desc: 'The Cognito Identity JS SDK creates the account directly against the user pool. Cognito emails a verification code. No password ever reaches my code.' },
+        { title: 'Log in', path: ['customer','cloudfront','cognito','apigw'],
+          desc: 'Cognito authenticates the credentials and returns a JWT ID token. The browser stores it and attaches it to every later API call.' },
+        { title: 'Load products', path: ['customer','cloudfront','apigw','lambda','rds'],
+          desc: 'GET /products reaches API Gateway, which triggers the easyshop-products function. It queries the products table in RDS over the private network and returns the catalogue.' },
+        { title: 'Start checkout', path: ['customer','cloudfront','apigw','lambda','stripe'],
+          desc: 'POST /create-checkout-session runs createCheckoutSession. It opens a Stripe Checkout session and hands back the hosted payment URL.' },
+        { title: 'Pay', path: ['customer','stripe'],
+          desc: 'The customer is redirected to Stripe and pays there. This is the important edge on the diagram: card data goes straight to Stripe and never touches my infrastructure.' },
+        { title: 'Record the order', path: ['customer','cloudfront','apigw','lambda','rds'],
+          desc: 'Stripe redirects back to the success page, which calls POST /orders. The createOrder function writes the order row to RDS and the cart is cleared.' },
+        { title: 'Send the receipt', path: ['apigw','lambda','ses'],
+          desc: 'POST /send-email triggers sendConfirmationEmail, which asks SES to deliver a personalised confirmation to the customer’s registered address.' },
+        { title: 'Admin image upload', path: ['customer','cloudfront','apigw','lambda','s3'],
+          desc: 'The admin panel asks getUploadUrl for a presigned S3 URL, then the browser uploads the image straight to S3. The file never passes through Lambda — no size limit, no compute cost.' },
+        { title: 'Everything is logged', path: ['lambda','cloudwatch'],
+          desc: 'Every invocation writes to its own CloudWatch log group. Eleven functions, eleven log groups, no configuration needed.' }
+      ]
     },
 
     soar: {
@@ -315,7 +356,17 @@
         { id: 'hive',    x: 570, y: 205, label: 'TheHive',      sub: 'case mgmt',     role: 'Case tracking',  desc: 'Confirmed incidents become structured cases with the enrichment already attached, so the investigation starts from context rather than a bare alert.' },
         { id: 'analyst', x: 745, y: 205, label: 'Analyst',      sub: 'human review',  role: 'Human',          desc: 'The analyst now opens a case that is already triaged and enriched. Judgement stays human; the assembly work does not.' }
       ],
-      edges: [['endp','wazuh'],['wazuh','shuffle'],['shuffle','enrich'],['shuffle','esc'],['shuffle','hive'],['hive','analyst']]
+      edges: [['endp','wazuh'],['wazuh','shuffle'],['shuffle','enrich'],['shuffle','esc'],['shuffle','hive'],['hive','analyst']],
+      flows: [
+        { title: 'Alert raised', path: ['endp','wazuh'],
+          desc: 'Wazuh agents ship file integrity, process and authentication events. A detection rule fires and an alert is born.' },
+        { title: 'Enrich automatically', path: ['wazuh','shuffle','enrich'],
+          desc: 'Shuffle picks the alert up by webhook and enriches every indicator — reputation, prior sightings, related events. This step is where most of the 60% time saving came from.' },
+        { title: 'Decide', path: ['shuffle','esc'],
+          desc: 'Severity rules decide what happens: close it as noise, raise a case, or page a human. The rules encode the judgement a tier-1 analyst was applying by hand.' },
+        { title: 'Open a case', path: ['shuffle','hive','analyst'],
+          desc: 'Anything real becomes a TheHive case with the enrichment already attached, so the analyst starts from context instead of a bare alert.' }
+      ]
     },
 
     acme: {
@@ -335,7 +386,17 @@
         { id: 'recover',  x: 430, y: 275, label: 'Recover',     sub: 'NIST CSF',      role: 'Function 5',     desc: 'Tested backup and restoration paths, because ransomware recovery is a restore problem before it is a security one.' },
         { id: 'report',   x: 650, y: 205, label: 'Exec Report', sub: 'deliverable',   role: 'Output',         desc: 'A findings and roadmap report written for executives, not engineers — prioritised by risk reduction per dollar so it could actually be funded.' }
       ],
-      edges: [['assess','identify'],['assess','protect'],['assess','detect'],['identify','respond'],['protect','respond'],['detect','recover'],['respond','report'],['recover','report']]
+      edges: [['assess','identify'],['assess','protect'],['assess','detect'],['identify','respond'],['protect','respond'],['detect','recover'],['respond','report'],['recover','report']],
+      flows: [
+        { title: 'Assess the damage', path: ['assess','identify'],
+          desc: 'Start from what actually happened: which assets existed, which were unknown, and what let the attacker move laterally once inside.' },
+        { title: 'Close the gaps', path: ['assess','protect','respond'],
+          desc: 'Segmentation, access control and hardening — the controls that decide whether one compromised host becomes an enterprise-wide event.' },
+        { title: 'See it sooner', path: ['assess','detect','recover'],
+          desc: 'Monitoring designed so the next intrusion surfaces in hours, paired with restore paths that are actually tested rather than assumed.' },
+        { title: 'Make it fundable', path: ['respond','report'],
+          desc: 'A findings and roadmap report written for executives, prioritised by risk reduction per dollar — because a recommendation nobody funds changes nothing.' }
+      ]
     }
   };
 
@@ -346,8 +407,92 @@
     if (!svg) return;
     var gEdges = $('#bp-edges'), gPackets = $('#bp-packets'), gNodes = $('#bp-nodes');
     var detail = $('#bp-detail'), metaBox = $('#proj-meta'), fileLabel = $('#bp-filename');
+    var flowStrip = $('#bp-flow'), blurbBox = $('#bp-blurb'), playBtn = $('#bp-play');
     var NS = 'http://www.w3.org/2000/svg';
     var packets = [], paths = [], raf = null, current = null;
+    var edgeMap = {}, nodeMap = {}, activeFlow = -1, playTimer = null;
+
+    function pairKey(a, b) { return a + '|' + b; }
+
+    /* Which edges belong to the selected journey step. Direction is
+       ignored — an edge is "hot" if the step walks it either way. */
+    function hotPairs(pathIds) {
+      var set = {};
+      for (var i = 0; i < pathIds.length - 1; i++) {
+        set[pairKey(pathIds[i], pathIds[i + 1])] = true;
+        set[pairKey(pathIds[i + 1], pathIds[i])] = true;
+      }
+      return set;
+    }
+
+    function clearFlow() {
+      activeFlow = -1;
+      svg.classList.remove('flowing');
+      $$('.bp-node', svg).forEach(function (g) { g.classList.remove('dim', 'lit'); });
+      Object.keys(edgeMap).forEach(function (k) {
+        edgeMap[k].path.classList.remove('hot', 'cold');
+        if (edgeMap[k].packet) edgeMap[k].packet.classList.remove('hot', 'cold');
+      });
+      $$('.flow-step', flowStrip).forEach(function (b) { b.classList.remove('active'); });
+    }
+
+    function selectFlow(idx, fromPlayer) {
+      var p = PROJECTS[current];
+      if (!p || !p.flows || !p.flows[idx]) return;
+      var step = p.flows[idx];
+      activeFlow = idx;
+      svg.classList.add('flowing');
+
+      var hot = hotPairs(step.path);
+      var inPath = {};
+      step.path.forEach(function (id) { inPath[id] = true; });
+
+      $$('.bp-node', svg).forEach(function (g) {
+        var on = inPath[g.getAttribute('data-id')];
+        g.classList.toggle('lit', !!on);
+        g.classList.toggle('dim', !on);
+      });
+
+      Object.keys(edgeMap).forEach(function (k) {
+        var on = !!hot[k];
+        edgeMap[k].path.classList.toggle('hot', on);
+        edgeMap[k].path.classList.toggle('cold', !on);
+        if (edgeMap[k].packet) {
+          edgeMap[k].packet.classList.toggle('hot', on);
+          edgeMap[k].packet.classList.toggle('cold', !on);
+        }
+      });
+
+      $$('.flow-step', flowStrip).forEach(function (b, i) {
+        b.classList.toggle('active', i === idx);
+      });
+
+      detail.innerHTML = '';
+      var n = document.createElement('p');
+      n.className = 'bp-role';
+      n.textContent = 'Step ' + (idx + 1) + ' of ' + p.flows.length;
+      var h = document.createElement('h4'); h.textContent = step.title;
+      var d = document.createElement('p'); d.textContent = step.desc;
+      detail.appendChild(n); detail.appendChild(h); detail.appendChild(d);
+
+      if (!fromPlayer) stopPlay();
+    }
+
+    function stopPlay() {
+      if (playTimer) { clearInterval(playTimer); playTimer = null; }
+      if (playBtn) { playBtn.classList.remove('playing'); playBtn.textContent = '▶ Play flow'; }
+    }
+
+    function startPlay() {
+      var p = PROJECTS[current];
+      if (!p || !p.flows) return;
+      selectFlow(0, true);
+      if (playBtn) { playBtn.classList.add('playing'); playBtn.textContent = '❚❚ Pause'; }
+      playTimer = setInterval(function () {
+        var next = (activeFlow + 1) % p.flows.length;
+        selectFlow(next, true);
+      }, 4200);
+    }
 
     function el(name, attrs) {
       var e = document.createElementNS(NS, name);
@@ -363,7 +508,8 @@
       current = key;
 
       gEdges.textContent = ''; gPackets.textContent = ''; gNodes.textContent = '';
-      packets = []; paths = [];
+      packets = []; paths = []; edgeMap = {}; nodeMap = {};
+      stopPlay();
       if (fileLabel) fileLabel.textContent = p.file;
 
       var byId = {};
@@ -383,12 +529,17 @@
         var dot = el('circle', { r: 3.2, class: 'bp-packet', cx: c1.x, cy: c1.y });
         gPackets.appendChild(dot);
         packets.push({ dot: dot, path: path, t: Math.random(), speed: 0.0026 + Math.random() * 0.0028 });
+
+        // Registered both ways so a journey step can walk the edge in either direction.
+        var rec = { path: path, packet: dot };
+        edgeMap[pairKey(pair[0], pair[1])] = rec;
+        edgeMap[pairKey(pair[1], pair[0])] = rec;
       });
 
       // nodes
       p.nodes.forEach(function (n) {
         var g = el('g', { class: 'bp-node', tabindex: '0', role: 'button',
-                          'aria-label': n.label + ' — ' + n.role });
+                          'data-id': n.id, 'aria-label': n.label + ' — ' + n.role });
         g.appendChild(el('rect', {
           x: n.x, y: n.y, width: NODE_W, height: NODE_H, rx: 9,
           fill: 'rgba(12,18,32,0.9)', stroke: 'rgba(140,160,210,0.28)', 'stroke-width': 1.3
@@ -400,6 +551,7 @@
         g.appendChild(lbl); g.appendChild(sub);
 
         function select() {
+          clearFlow();
           $$('.bp-node', svg).forEach(function (o) { o.classList.remove('sel'); });
           g.classList.add('sel');
           detail.innerHTML = '';
@@ -427,12 +579,33 @@
         });
       }
 
-      detail.innerHTML = '<p class="bp-hint">Select a node above to inspect it.</p>';
+      // journey blurb
+      if (blurbBox) blurbBox.textContent = p.blurb || '';
+
+      // journey steps
+      if (flowStrip) {
+        flowStrip.innerHTML = '';
+        (p.flows || []).forEach(function (step, i) {
+          var b = document.createElement('button');
+          b.className = 'flow-step';
+          b.type = 'button';
+          b.innerHTML = '<span class="fs-num">' + (i + 1) + '</span>'
+                      + '<span class="fs-label"></span>';
+          b.querySelector('.fs-label').textContent = step.title;
+          b.addEventListener('click', function () { selectFlow(i); });
+          flowStrip.appendChild(b);
+        });
+      }
+      if (playBtn) playBtn.style.display = (p.flows && p.flows.length) ? '' : 'none';
+
+      detail.innerHTML = '<p class="bp-hint">Play the flow, pick a step, or click any node to inspect it.</p>';
     }
 
     function animate() {
       for (var i = 0; i < packets.length; i++) {
         var pk = packets[i];
+        // Frozen packets on dimmed edges would read as traffic that isn't there.
+        if (pk.dot.classList.contains('cold')) continue;
         pk.t += pk.speed;
         if (pk.t > 1) pk.t = 0;
         try {
@@ -457,6 +630,12 @@
         render(tab.getAttribute('data-proj'));
       });
     });
+
+    if (playBtn) {
+      playBtn.addEventListener('click', function () {
+        if (playTimer) { stopPlay(); } else { startPlay(); }
+      });
+    }
 
     render('easyshop');
     if (!reduceMotion) {
@@ -567,6 +746,7 @@
 
       projects: function () {
         line('<span class="t-key">easyshop</span>  <span class="t-dim">Serverless e-commerce on AWS · Seneca capstone 2026</span>');
+        line('          <span class="t-dim">11 Lambdas · Multi-AZ RDS · Cognito · Stripe · SES · $52.71 all-in</span>');
         line('<span class="t-key">soar</span>      <span class="t-dim">Automated incident response · Shuffle + Wazuh + TheHive</span>');
         line('<span class="t-key">acme</span>      <span class="t-dim">Post-ransomware security redesign · NIST CSF · York 2025</span>');
         line('');

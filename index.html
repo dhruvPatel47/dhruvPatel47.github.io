@@ -107,11 +107,11 @@
           code.
         </p>
         <p>
-          Now I build on AWS. My capstone was a full serverless e-commerce platform: custom VPC
+          Now I build on AWS. My capstone was a full serverless e-commerce platform: a custom VPC
           across two availability zones, Multi-AZ RDS with automatic failover, eleven Lambda
-          functions behind API Gateway, Cognito for auth, KMS for encryption at rest — and the
-          whole thing ran under <strong>$52</strong> because cost is an architecture decision
-          too.
+          functions behind API Gateway, Cognito holding every credential, Stripe handling every
+          card. Total spend across the entire build was <strong>$52.71</strong> — cost is an
+          architecture decision too.
         </p>
         <p>
           Two postgraduate credentials in Ontario, one in cloud architecture and one in
@@ -213,7 +213,8 @@
   <div class="container">
     <h2 class="section-title reveal"><span class="sec-num">03</span> Projects</h2>
     <p class="section-lead reveal">
-      Live architecture. Click any node to see what it does and why it's there.
+      Live architecture. Play the flow to watch a real request travel the system, or click
+      any node to see what it does and why it's there.
     </p>
 
     <div class="bp-switch reveal" role="tablist" aria-label="Select project architecture">
@@ -228,8 +229,15 @@
         <span class="card-title" id="bp-filename">easyshop-architecture.svg</span>
         <span class="bp-live"><span class="pulse-dot"></span>live</span>
       </div>
+      <p class="bp-blurb" id="bp-blurb"></p>
+
+      <div class="bp-flowbar">
+        <button class="bp-play" id="bp-play" type="button">▶ Play flow</button>
+        <div class="bp-flow" id="bp-flow" role="group" aria-label="Request journey steps"></div>
+      </div>
+
       <div class="bp-stage">
-        <svg id="bp-svg" viewBox="0 0 900 480" role="img" aria-label="Interactive architecture diagram">
+        <svg id="bp-svg" viewBox="0 0 900 445" role="img" aria-label="Interactive architecture diagram">
           <defs>
             <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.1"/>
