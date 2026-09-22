@@ -1,6 +1,6 @@
 /* ============================================================
    Dhruv Patel — portfolio
-   Vanilla JS, no dependencies.
+   Vanilla JS, no dependencies, no build step.
    ============================================================ */
 (function () {
   'use strict';
@@ -8,252 +8,345 @@
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var $  = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
+  var ACID = '#ccff00';
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var a = arguments, c = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(c, a); }, ms);
+    };
+  }
 
   /* ---------------------------------------------------------
-     1. Animated perspective grid + drifting nodes
+     1. Preloader
      --------------------------------------------------------- */
-  function initGrid() {
-    var cv = $('#grid-canvas');
+  function initLoader() {
+    var loader = $('#loader'), num = $('#loader-num'),
+        fill = $('#loader-fill'), status = $('#loader-status');
+    if (!loader) return;
+
+    var steps = ['INITIALISING', 'MOUNTING /PROFILE', 'RESOLVING TOPOLOGY',
+                 'LOADING ARCHITECTURE', 'READY'];
+    var pct = 0;
+
+    function done() {
+      loader.classList.add('done');
+      document.body.classList.remove('is-loading');
+      document.documentElement.classList.add('ready');
+      // Hero type animates in only once the curtain is actually lifting.
+      setTimeout(function () { $$('.hero [data-scramble]').forEach(scramble); }, 120);
+    }
+
+    if (reduceMotion) { done(); return; }
+
+    var timer = setInterval(function () {
+      // Uneven increments read as real work rather than a fake progress bar.
+      pct += Math.random() * 14 + 4;
+      if (pct >= 100) {
+        pct = 100;
+        clearInterval(timer);
+        setTimeout(done, 380);
+      }
+      var p = Math.floor(pct);
+      if (num) num.textContent = p < 10 ? '0' + p : String(p);
+      if (fill) fill.style.width = p + '%';
+      if (status) status.textContent = steps[Math.min(Math.floor(p / 25), steps.length - 1)];
+    }, 130);
+
+    // Never let a stalled timer trap the page.
+    setTimeout(function () { clearInterval(timer); done(); }, 4200);
+  }
+
+  /* ---------------------------------------------------------
+     2. Hero flow field — layered contour lines
+     --------------------------------------------------------- */
+  function initFlow() {
+    var cv = $('#flow');
     if (!cv) return;
     var ctx = cv.getContext('2d');
     var w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var nodes = [], t = 0, raf = null;
+    var t = 0, raf = null;
 
     function resize() {
       w = cv.clientWidth; h = cv.clientHeight;
       cv.width = w * dpr; cv.height = h * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      seed();
-    }
-
-    function seed() {
-      // Node count scales with area, capped so phones stay smooth.
-      var count = Math.min(Math.round((w * h) / 26000), 70);
-      nodes = [];
-      for (var i = 0; i < count; i++) {
-        nodes.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          vx: (Math.random() - 0.5) * 0.22,
-          vy: (Math.random() - 0.5) * 0.22,
-          r: Math.random() * 1.6 + 0.7
-        });
-      }
+      if (reduceMotion) draw();
     }
 
     function draw() {
       ctx.clearRect(0, 0, w, h);
-      t += 0.0022;
+      t += 0.0045;
 
-      // --- perspective floor grid ---
-      var horizon = h * 0.62;
-      ctx.lineWidth = 1;
+      var rows = Math.max(26, Math.round(h / 13));
+      var step = Math.max(6, Math.round(w / 190));
 
-      // vertical rays converging on a vanishing point
-      ctx.strokeStyle = 'rgba(0,229,255,0.055)';
-      var vpx = w / 2;
-      for (var i = -26; i <= 26; i++) {
+      for (var r = 0; r < rows; r++) {
+        var baseY = (r / rows) * h;
+        // Lines fade toward the bottom so the type stays dominant.
+        var fade = 1 - (r / rows) * 0.55;
         ctx.beginPath();
-        ctx.moveTo(vpx + i * 46, horizon);
-        ctx.lineTo(vpx + i * 340, h + 60);
+        for (var x = 0; x <= w; x += step) {
+          var nx = x / w, ny = r / rows;
+          var y = baseY
+            + Math.sin(nx * 5.4 + t * 1.5 + ny * 3.1) * 26 * fade
+            + Math.sin(nx * 11.3 - t * 2.1 + ny * 6.7) * 11 * fade
+            + Math.cos(nx * 2.2 + t * 0.8 - ny * 1.9) * 18 * fade;
+          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = 'rgba(204,255,0,' + (0.34 * fade).toFixed(4) + ')';
+        ctx.lineWidth = 1;
         ctx.stroke();
       }
-
-      // horizontal lines, scrolling toward the viewer
-      for (var j = 0; j < 22; j++) {
-        var p = ((j / 22) + (t % (1 / 22)) * 22) % 1;
-        var y = horizon + Math.pow(p, 2.6) * (h - horizon + 70);
-        var a = 0.085 * (1 - p);
-        ctx.strokeStyle = 'rgba(0,229,255,' + a.toFixed(4) + ')';
-        ctx.beginPath();
-        ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-      }
-
-      // --- floating node constellation (upper area) ---
-      for (var n = 0; n < nodes.length; n++) {
-        var o = nodes[n];
-        o.x += o.vx; o.y += o.vy;
-        if (o.x < -20) o.x = w + 20; if (o.x > w + 20) o.x = -20;
-        if (o.y < -20) o.y = h + 20; if (o.y > h + 20) o.y = -20;
-
-        ctx.beginPath();
-        ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,229,255,0.5)';
-        ctx.fill();
-      }
-
-      // link nearby nodes
-      for (var a1 = 0; a1 < nodes.length; a1++) {
-        for (var b1 = a1 + 1; b1 < nodes.length; b1++) {
-          var dx = nodes[a1].x - nodes[b1].x, dy = nodes[a1].y - nodes[b1].y;
-          var d2 = dx * dx + dy * dy;
-          if (d2 < 17000) {
-            var op = (1 - d2 / 17000) * 0.2;
-            ctx.strokeStyle = 'rgba(0,229,255,' + op.toFixed(4) + ')';
-            ctx.beginPath();
-            ctx.moveTo(nodes[a1].x, nodes[a1].y);
-            ctx.lineTo(nodes[b1].x, nodes[b1].y);
-            ctx.stroke();
-          }
-        }
-      }
-      raf = requestAnimationFrame(draw);
+      if (!reduceMotion) raf = requestAnimationFrame(draw);
     }
 
     resize();
     window.addEventListener('resize', debounce(resize, 180));
-
-    if (reduceMotion) { drawStatic(); return; }
+    if (reduceMotion) return;
     draw();
 
-    // Pause the loop when the tab is hidden — no point burning cycles.
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) { cancelAnimationFrame(raf); raf = null; }
       else if (!raf) { raf = requestAnimationFrame(draw); }
     });
-
-    function drawStatic() {
-      ctx.clearRect(0, 0, w, h);
-      ctx.strokeStyle = 'rgba(0,229,255,0.05)';
-      for (var x = 0; x < w; x += 46) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
-      for (var y = 0; y < h; y += 46) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-    }
   }
 
   /* ---------------------------------------------------------
-     2. Typed role line
+     3. Perspective room — grid lines converging on a vanishing point
      --------------------------------------------------------- */
-  function initTyped() {
-    var el = $('#typed-role');
-    if (!el) return;
-    var roles = [
-      'Cloud Engineer',
-      'Security Analyst',
-      'AWS Solutions Builder',
-      'Infrastructure Automation'
-    ];
+  function initRoom() {
+    var svg = $('#room');
+    if (!svg) return;
+    var NS = 'http://www.w3.org/2000/svg';
+    var vx = 0.5, vy = 0.5, tx = 0.5, ty = 0.5, raf = null;
 
-    if (reduceMotion) { el.textContent = roles[0]; return; }
+    function build() {
+      var box = svg.getBoundingClientRect();
+      var W = box.width, H = box.height;
+      if (!W || !H) return;
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      svg.textContent = '';
 
-    var ri = 0, ci = 0, deleting = false;
+      var px = W * vx, py = H * vy;
+      var frag = document.createDocumentFragment();
 
-    (function tick() {
-      var word = roles[ri];
-      el.textContent = word.slice(0, ci);
-
-      var delay;
-      if (!deleting) {
-        ci++;
-        delay = 72;
-        if (ci > word.length) { deleting = true; delay = 1900; }
-      } else {
-        ci--;
-        delay = 36;
-        if (ci === 0) { deleting = false; ri = (ri + 1) % roles.length; delay = 380; }
+      function line(x1, y1, x2, y2, op) {
+        var l = document.createElementNS(NS, 'line');
+        l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+        l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+        l.setAttribute('stroke', ACID);
+        l.setAttribute('stroke-opacity', op);
+        l.setAttribute('stroke-width', '1');
+        frag.appendChild(l);
       }
-      setTimeout(tick, delay);
+
+      // rays from the frame edge to the vanishing point
+      var N = 16;
+      for (var i = 0; i <= N; i++) {
+        var f = i / N;
+        line(f * W, 0, px, py, 0.13);
+        line(f * W, H, px, py, 0.13);
+        line(0, f * H, px, py, 0.13);
+        line(W, f * H, px, py, 0.13);
+      }
+
+      // concentric frames stepping back toward the vanishing point
+      for (var d = 1; d <= 7; d++) {
+        var k = Math.pow(d / 8, 1.85);
+        var x1 = px + (0 - px) * (1 - k), y1 = py + (0 - py) * (1 - k);
+        var x2 = px + (W - px) * (1 - k), y2 = py + (H - py) * (1 - k);
+        var rect = document.createElementNS(NS, 'rect');
+        rect.setAttribute('x', Math.min(x1, x2)); rect.setAttribute('y', Math.min(y1, y2));
+        rect.setAttribute('width', Math.abs(x2 - x1)); rect.setAttribute('height', Math.abs(y2 - y1));
+        rect.setAttribute('fill', 'none');
+        rect.setAttribute('stroke', ACID);
+        rect.setAttribute('stroke-opacity', 0.16 - d * 0.014);
+        rect.setAttribute('stroke-width', '1');
+        frag.appendChild(rect);
+      }
+
+      svg.appendChild(frag);
+    }
+
+    build();
+    window.addEventListener('resize', debounce(build, 200));
+
+    if (reduceMotion || !window.matchMedia('(pointer:fine)').matches) return;
+
+    // The vanishing point drifts toward the pointer — subtle parallax.
+    window.addEventListener('mousemove', function (e) {
+      tx = 0.5 + (e.clientX / window.innerWidth - 0.5) * 0.22;
+      ty = 0.5 + (e.clientY / window.innerHeight - 0.5) * 0.22;
+    });
+
+    (function follow() {
+      var dx = tx - vx, dy = ty - vy;
+      if (Math.abs(dx) > 0.0007 || Math.abs(dy) > 0.0007) {
+        vx += dx * 0.05; vy += dy * 0.05;
+        build();
+      }
+      raf = requestAnimationFrame(follow);
     })();
   }
 
   /* ---------------------------------------------------------
-     3. Scroll reveal + counters + scroll progress + nav state
+     3b. Fit the giant type edge to edge
      --------------------------------------------------------- */
-  function initScroll() {
-    var revealEls = $$('.reveal');
+  var scrambling = 0;
 
-    if ('IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e, i) {
-          if (!e.isIntersecting) return;
-          // Small stagger so groups cascade instead of popping together.
-          setTimeout(function () { e.target.classList.add('in'); }, i * 70);
-          io.unobserve(e.target);
-        });
-      }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' });
-      revealEls.forEach(function (el) { io.observe(el); });
-    } else {
-      revealEls.forEach(function (el) { el.classList.add('in'); });
+  function fitGiant() {
+    // Measuring mid-scramble would size the line to decoding glyphs.
+    if (scrambling > 0) return;
+    $$('.giant').forEach(function (el) {
+      var parent = el.parentElement;
+      if (!parent) return;
+      var avail = parent.clientWidth;
+      if (!avail) return;
+
+      // Measure at a known size, then scale so the line spans the column.
+      // max-width must come off first: at the probe size the line overflows,
+      // and a clamped box reports its clamped width, not the text's real one.
+      el.style.maxWidth = 'none';
+      el.style.fontSize = '100px';
+      var natural = el.getBoundingClientRect().width;
+      el.style.maxWidth = '';
+
+      if (!natural) { el.style.fontSize = ''; return; }
+
+      var size = 100 * (avail / natural);
+      // A short line on an ultrawide monitor would otherwise set type taller
+      // than the screen. Capping costs a little rag on the right; worth it.
+      size = Math.min(size, window.innerHeight * 0.62);
+      // Floor keeps a sub-pixel rounding error from forcing an overflow.
+      el.style.fontSize = Math.floor(size * 100) / 100 + 'px';
+    });
+  }
+
+  function initFit() {
+    // Web fonts change the metrics, so re-fit once they have landed.
+    fitGiant();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(fitGiant);
     }
-
-    // counters
-    var counters = $$('.counter'), done = [];
-    function runCounters() {
-      counters.forEach(function (c) {
-        if (done.indexOf(c) > -1) return;
-        var r = c.getBoundingClientRect();
-        if (r.top > window.innerHeight - 40) return;
-        done.push(c);
-        var target = parseInt(c.getAttribute('data-target'), 10) || 0;
-        if (reduceMotion) { c.textContent = target; return; }
-        var start = performance.now(), dur = 1500;
-        (function step(now) {
-          var p = Math.min((now - start) / dur, 1);
-          // easeOutExpo
-          var eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
-          c.textContent = Math.round(target * eased);
-          if (p < 1) requestAnimationFrame(step);
-        })(start);
-      });
-    }
-
-    var nav = $('#nav'), bar = $('#scroll-progress');
-    var sections = $$('main section[id]');
-    var navLinks = $$('.nav-links a[data-nav]');
-
-    function onScroll() {
-      var y = window.scrollY || window.pageYOffset;
-      if (nav) nav.classList.toggle('scrolled', y > 40);
-
-      if (bar) {
-        var max = document.documentElement.scrollHeight - window.innerHeight;
-        bar.style.width = (max > 0 ? (y / max) * 100 : 0) + '%';
-      }
-
-      // scrollspy
-      var current = '';
-      sections.forEach(function (s) {
-        if (y >= s.offsetTop - 140) current = s.id;
-      });
-      navLinks.forEach(function (a) {
-        a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-      });
-
-      runCounters();
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+    window.addEventListener('resize', debounce(fitGiant, 140));
   }
 
   /* ---------------------------------------------------------
-     4. Cursor glow + hero glitch + mobile nav
+     4. Text scramble
+     --------------------------------------------------------- */
+  var GLYPHS = '█▓▒░#@%&$/\\<>[]{}=+*ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+  var SCRAMBLE_MS = 700;
+
+  function scramble(el) {
+    if (reduceMotion || el.dataset.done === '1') return;
+    el.dataset.done = '1';
+
+    var final = el.textContent;
+    var len = final.length;
+    if (!len) return;
+
+    // Lock the box first: decoding glyphs are wider than the real ones and
+    // would otherwise reflow the whole line on every frame.
+    var w = el.getBoundingClientRect().width;
+    if (w) el.style.minWidth = w + 'px';
+
+    var starts = [], ends = [];
+    for (var i = 0; i < len; i++) {
+      var s = Math.random() * 0.35;
+      starts.push(s);
+      ends.push(s + 0.25 + Math.random() * 0.4);
+    }
+
+    var settled = false;
+    scrambling++;
+    function settle() {
+      if (settled) return;
+      settled = true;
+      scrambling--;
+      el.textContent = final;
+      el.style.minWidth = '';
+      if (scrambling === 0) fitGiant();
+    }
+
+    var t0 = performance.now();
+    (function frame(now) {
+      if (settled) return;
+      // Driven by wall-clock, not frame count — a throttled tab must never
+      // leave a visitor staring at a garbled name.
+      var p = Math.min(((now || performance.now()) - t0) / SCRAMBLE_MS, 1);
+      if (p >= 1) { settle(); return; }
+
+      var out = '';
+      for (var i = 0; i < len; i++) {
+        var ch = final[i];
+        if (ch === ' ') { out += ' '; continue; }
+        if (p >= ends[i]) out += ch;
+        else if (p >= starts[i]) out += GLYPHS[(Math.random() * GLYPHS.length) | 0];
+        else out += ' ';
+      }
+      el.textContent = out;
+      requestAnimationFrame(frame);
+    })(t0);
+
+    // Hard guarantee independent of requestAnimationFrame.
+    setTimeout(settle, SCRAMBLE_MS + 400);
+  }
+
+  function initScramble() {
+    var targets = $$('[data-scramble]').filter(function (el) { return !el.closest('.hero'); });
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        scramble(e.target);
+        io.unobserve(e.target);
+      });
+    }, { threshold: 0.5 });
+    targets.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---------------------------------------------------------
+     5. Ticker
+     --------------------------------------------------------- */
+  function initTicker() {
+    var track = $('#ticker-track');
+    if (!track) return;
+    var items = ['AWS', '✦', 'SERVERLESS', '✦', 'MULTI-AZ', '✦', 'SIEM', '✦', 'MITRE ATT&CK',
+                 '✦', 'NIST CSF', '✦', 'INCIDENT RESPONSE', '✦', 'ZERO TRUST', '✦', 'LAMBDA',
+                 '✦', 'COGNITO', '✦', 'SOC', '✦', 'THREAT HUNTING', '✦', 'ISO 27001', '✦'];
+    // Rendered twice so the -50% keyframe loops seamlessly.
+    var html = '';
+    for (var pass = 0; pass < 2; pass++) {
+      items.forEach(function (s) { html += '<span>' + s + '</span>'; });
+    }
+    track.innerHTML = html;
+  }
+
+  /* ---------------------------------------------------------
+     6. Cursor, nav, clock, reveals, counters
      --------------------------------------------------------- */
   function initChrome() {
-    var glow = $('#cursor-glow');
-    if (glow && !reduceMotion && window.matchMedia('(pointer:fine)').matches) {
-      var gx = 0, gy = 0, cx = 0, cy = 0;
+    var cur = $('#cursor');
+    if (cur && !reduceMotion && window.matchMedia('(pointer:fine)').matches) {
       document.body.classList.add('has-cursor');
+      var gx = 0, gy = 0, cx = 0, cy = 0;
       window.addEventListener('mousemove', function (e) { gx = e.clientX; gy = e.clientY; });
       (function follow() {
-        cx += (gx - cx) * 0.1;
-        cy += (gy - cy) * 0.1;
-        glow.style.transform = 'translate(' + cx + 'px,' + cy + 'px)';
+        cx += (gx - cx) * 0.16; cy += (gy - cy) * 0.16;
+        cur.style.transform = 'translate(' + cx + 'px,' + cy + 'px)';
         requestAnimationFrame(follow);
       })();
+
+      document.addEventListener('mouseover', function (e) {
+        var t = e.target.closest('[data-cursor="link"], a, button, input');
+        cur.classList.toggle('on', !!t);
+      });
     }
 
-    // occasional glitch flicker on the name
-    var name = $('.hero-name');
-    if (name && !reduceMotion) {
-      setInterval(function () {
-        if (Math.random() > 0.72) {
-          name.classList.add('glitch');
-          setTimeout(function () { name.classList.remove('glitch'); }, 130);
-        }
-      }, 2600);
-    }
-
-    // mobile nav
     var toggle = $('#nav-toggle'), links = $('.nav-links');
     if (toggle && links) {
       toggle.addEventListener('click', function () {
@@ -261,19 +354,85 @@
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
       links.addEventListener('click', function (e) {
-        if (e.target.tagName === 'A') {
+        if (e.target.closest('a')) {
           links.classList.remove('open');
           toggle.setAttribute('aria-expanded', 'false');
         }
       });
     }
 
+    var clock = $('#clock');
+    if (clock) {
+      (function tick() {
+        // Toronto time, since that's where he is and where the job is.
+        var s = new Date().toLocaleTimeString('en-CA', {
+          hour12: false, timeZone: 'America/Toronto'
+        });
+        clock.textContent = s + ' EST';
+        setTimeout(tick, 1000);
+      })();
+    }
+
     var yr = $('#year');
     if (yr) yr.textContent = new Date().getFullYear();
   }
 
+  function initScroll() {
+    // Everything inside a section reveals on scroll except the hero,
+    // which the preloader hands over already visible.
+    $$('.section .wrap > *, .room-content > *, .ticker').forEach(function (el) {
+      el.classList.add('rv');
+    });
+    var revealEls = $$('.rv');
+
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e, i) {
+          if (!e.isIntersecting) return;
+          setTimeout(function () { e.target.classList.add('in'); }, i * 65);
+          io.unobserve(e.target);
+        });
+      }, { threshold: 0.08, rootMargin: '0px 0px -50px 0px' });
+      revealEls.forEach(function (el) { io.observe(el); });
+    } else {
+      revealEls.forEach(function (el) { el.classList.add('in'); });
+    }
+
+    var counters = $$('.counter'), done = [];
+    function runCounters() {
+      counters.forEach(function (c) {
+        if (done.indexOf(c) > -1) return;
+        if (c.getBoundingClientRect().top > window.innerHeight - 40) return;
+        done.push(c);
+        var target = parseInt(c.getAttribute('data-target'), 10) || 0;
+        if (reduceMotion) { c.textContent = target; return; }
+        var start = performance.now(), dur = 1600;
+        (function step(now) {
+          var p = Math.min((now - start) / dur, 1);
+          var eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+          c.textContent = Math.round(target * eased);
+          if (p < 1) requestAnimationFrame(step);
+        })(start);
+      });
+    }
+
+    var sections = $$('main section[id]');
+    var navLinks = $$('.nav-links a[data-nav]');
+    function onScroll() {
+      var y = window.scrollY || window.pageYOffset;
+      var current = '';
+      sections.forEach(function (s) { if (y >= s.offsetTop - 160) current = s.id; });
+      navLinks.forEach(function (a) {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+      });
+      runCounters();
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
   /* ---------------------------------------------------------
-     5. Live architecture blueprint
+     7. Project data
      --------------------------------------------------------- */
   var PROJECTS = {
     easyshop: {
@@ -298,7 +457,7 @@
         { id: 'apigw',     x: 325, y: 240, label: 'API Gateway', sub: 'HTTP API · 10 routes', role: 'API layer',
           desc: 'HTTP API on the dev stage, 10 routes covering product and order CRUD, Stripe checkout, email and presigned uploads. CORS is locked to the CloudFront origin.' },
         { id: 'stripe',    x: 495, y: 45,  label: 'Stripe',      sub: 'hosted checkout',   role: 'Payments',
-          desc: 'Checkout runs on Stripe’s hosted page. Card numbers, CVV and billing details are entered on Stripe’s PCI-compliant infrastructure and never pass through my application or database.' },
+          desc: 'Checkout runs on Stripe\u2019s hosted page. Card numbers, CVV and billing details are entered on Stripe\u2019s PCI-compliant infrastructure and never pass through my application or database.' },
         { id: 'lambda',    x: 495, y: 240, label: 'Lambda × 11', sub: 'private subnets',   role: 'Compute',
           desc: 'Eleven single-purpose Node.js functions — products CRUD, orders CRUD, createCheckoutSession, sendConfirmationEmail, getUploadUrl. They run in private subnets and reach the internet only through NAT gateways.' },
         { id: 'cloudwatch',x: 495, y: 380, label: 'CloudWatch',  sub: '11 log groups',     role: 'Observability',
@@ -331,7 +490,7 @@
         { title: 'Record the order', path: ['customer','cloudfront','apigw','lambda','rds'],
           desc: 'Stripe redirects back to the success page, which calls POST /orders. The createOrder function writes the order row to RDS and the cart is cleared.' },
         { title: 'Send the receipt', path: ['apigw','lambda','ses'],
-          desc: 'POST /send-email triggers sendConfirmationEmail, which asks SES to deliver a personalised confirmation to the customer’s registered address.' },
+          desc: 'POST /send-email triggers sendConfirmationEmail, which asks SES to deliver a personalised confirmation to the customer\u2019s registered address.' },
         { title: 'Admin image upload', path: ['customer','cloudfront','apigw','lambda','s3'],
           desc: 'The admin panel asks getUploadUrl for a presigned S3 URL, then the browser uploads the image straight to S3. The file never passes through Lambda — no size limit, no compute cost.' },
         { title: 'Everything is logged', path: ['lambda','cloudwatch'],
@@ -341,6 +500,8 @@
 
     soar: {
       file: 'soar-pipeline.svg',
+      blurb: 'An automated incident-response pipeline. Alerts arrive, get enriched and triaged without a human, ' +
+             'and only reach an analyst once there is something worth their attention.',
       meta: [
         ['Context', 'Personal build · 2024–2025'],
         ['Manual triage', 'Down 60%'],
@@ -371,6 +532,8 @@
 
     acme: {
       file: 'acme-nist-redesign.svg',
+      blurb: 'An enterprise security redesign carried out after a ransomware incident, structured around the ' +
+             'NIST Cybersecurity Framework and written to be funded, not just filed.',
       meta: [
         ['Context', 'York University · 2025'],
         ['Trigger', 'Post-ransomware assessment'],
@@ -402,6 +565,9 @@
 
   var NODE_W = 128, NODE_H = 52;
 
+  /* ---------------------------------------------------------
+     8. Blueprint engine
+     --------------------------------------------------------- */
   function initBlueprint() {
     var svg = $('#bp-svg');
     if (!svg) return;
@@ -409,13 +575,18 @@
     var detail = $('#bp-detail'), metaBox = $('#proj-meta'), fileLabel = $('#bp-filename');
     var flowStrip = $('#bp-flow'), blurbBox = $('#bp-blurb'), playBtn = $('#bp-play');
     var NS = 'http://www.w3.org/2000/svg';
-    var packets = [], paths = [], raf = null, current = null;
-    var edgeMap = {}, nodeMap = {}, activeFlow = -1, playTimer = null;
+    var packets = [], raf = null, current = null;
+    var edgeMap = {}, activeFlow = -1, playTimer = null;
 
+    function el(name, attrs) {
+      var e = document.createElementNS(NS, name);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+    function centre(n) { return { x: n.x + NODE_W / 2, y: n.y + NODE_H / 2 }; }
     function pairKey(a, b) { return a + '|' + b; }
 
-    /* Which edges belong to the selected journey step. Direction is
-       ignored — an edge is "hot" if the step walks it either way. */
+    /* Direction is ignored — an edge is "hot" if the step walks it either way. */
     function hotPairs(pathIds) {
       var set = {};
       for (var i = 0; i < pathIds.length - 1; i++) {
@@ -427,7 +598,6 @@
 
     function clearFlow() {
       activeFlow = -1;
-      svg.classList.remove('flowing');
       $$('.bp-node', svg).forEach(function (g) { g.classList.remove('dim', 'lit'); });
       Object.keys(edgeMap).forEach(function (k) {
         edgeMap[k].path.classList.remove('hot', 'cold');
@@ -441,18 +611,16 @@
       if (!p || !p.flows || !p.flows[idx]) return;
       var step = p.flows[idx];
       activeFlow = idx;
-      svg.classList.add('flowing');
 
-      var hot = hotPairs(step.path);
-      var inPath = {};
+      var hot = hotPairs(step.path), inPath = {};
       step.path.forEach(function (id) { inPath[id] = true; });
 
       $$('.bp-node', svg).forEach(function (g) {
         var on = inPath[g.getAttribute('data-id')];
         g.classList.toggle('lit', !!on);
         g.classList.toggle('dim', !on);
+        g.classList.remove('sel');
       });
-
       Object.keys(edgeMap).forEach(function (k) {
         var on = !!hot[k];
         edgeMap[k].path.classList.toggle('hot', on);
@@ -462,10 +630,7 @@
           edgeMap[k].packet.classList.toggle('cold', !on);
         }
       });
-
-      $$('.flow-step', flowStrip).forEach(function (b, i) {
-        b.classList.toggle('active', i === idx);
-      });
+      $$('.flow-step', flowStrip).forEach(function (b, i) { b.classList.toggle('active', i === idx); });
 
       detail.innerHTML = '';
       var n = document.createElement('p');
@@ -480,27 +645,17 @@
 
     function stopPlay() {
       if (playTimer) { clearInterval(playTimer); playTimer = null; }
-      if (playBtn) { playBtn.classList.remove('playing'); playBtn.textContent = '▶ Play flow'; }
+      if (playBtn) { playBtn.classList.remove('playing'); playBtn.textContent = '▶ PLAY FLOW'; }
     }
-
     function startPlay() {
       var p = PROJECTS[current];
       if (!p || !p.flows) return;
       selectFlow(0, true);
-      if (playBtn) { playBtn.classList.add('playing'); playBtn.textContent = '❚❚ Pause'; }
+      if (playBtn) { playBtn.classList.add('playing'); playBtn.textContent = '❚❚ PAUSE'; }
       playTimer = setInterval(function () {
-        var next = (activeFlow + 1) % p.flows.length;
-        selectFlow(next, true);
+        selectFlow((activeFlow + 1) % p.flows.length, true);
       }, 4200);
     }
-
-    function el(name, attrs) {
-      var e = document.createElementNS(NS, name);
-      for (var k in attrs) e.setAttribute(k, attrs[k]);
-      return e;
-    }
-
-    function centre(n) { return { x: n.x + NODE_W / 2, y: n.y + NODE_H / 2 }; }
 
     function render(key) {
       var p = PROJECTS[key];
@@ -508,14 +663,13 @@
       current = key;
 
       gEdges.textContent = ''; gPackets.textContent = ''; gNodes.textContent = '';
-      packets = []; paths = []; edgeMap = {}; nodeMap = {};
+      packets = []; edgeMap = {};
       stopPlay();
       if (fileLabel) fileLabel.textContent = p.file;
 
       var byId = {};
       p.nodes.forEach(function (n) { byId[n.id] = n; });
 
-      // edges as curves, so crossing links stay readable
       p.edges.forEach(function (pair) {
         var a = byId[pair[0]], b = byId[pair[1]];
         if (!a || !b) return;
@@ -524,25 +678,23 @@
         var d = 'M' + c1.x + ',' + c1.y + ' C' + mx + ',' + c1.y + ' ' + mx + ',' + c2.y + ' ' + c2.x + ',' + c2.y;
         var path = el('path', { d: d, class: 'bp-edge' });
         gEdges.appendChild(path);
-        paths.push(path);
 
         var dot = el('circle', { r: 3.2, class: 'bp-packet', cx: c1.x, cy: c1.y });
         gPackets.appendChild(dot);
         packets.push({ dot: dot, path: path, t: Math.random(), speed: 0.0026 + Math.random() * 0.0028 });
 
-        // Registered both ways so a journey step can walk the edge in either direction.
         var rec = { path: path, packet: dot };
         edgeMap[pairKey(pair[0], pair[1])] = rec;
         edgeMap[pairKey(pair[1], pair[0])] = rec;
       });
 
-      // nodes
       p.nodes.forEach(function (n) {
         var g = el('g', { class: 'bp-node', tabindex: '0', role: 'button',
-                          'data-id': n.id, 'aria-label': n.label + ' — ' + n.role });
+                          'data-id': n.id, 'data-cursor': 'link',
+                          'aria-label': n.label + ' — ' + n.role });
         g.appendChild(el('rect', {
-          x: n.x, y: n.y, width: NODE_W, height: NODE_H, rx: 9,
-          fill: 'rgba(12,18,32,0.9)', stroke: 'rgba(140,160,210,0.28)', 'stroke-width': 1.3
+          x: n.x, y: n.y, width: NODE_W, height: NODE_H,
+          fill: 'rgba(10,10,10,0.92)', stroke: 'rgba(204,255,0,0.3)', 'stroke-width': 1.2
         }));
         var lbl = el('text', { x: n.x + NODE_W / 2, y: n.y + 22, 'text-anchor': 'middle', class: 'n-label' });
         lbl.textContent = n.label;
@@ -560,7 +712,6 @@
           var d = document.createElement('p'); d.textContent = n.desc;
           detail.appendChild(h); detail.appendChild(r); detail.appendChild(d);
         }
-
         g.addEventListener('click', select);
         g.addEventListener('keydown', function (e) {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); }
@@ -568,7 +719,6 @@
         gNodes.appendChild(g);
       });
 
-      // meta cards
       if (metaBox) {
         metaBox.innerHTML = '';
         p.meta.forEach(function (row) {
@@ -579,18 +729,15 @@
         });
       }
 
-      // journey blurb
       if (blurbBox) blurbBox.textContent = p.blurb || '';
 
-      // journey steps
       if (flowStrip) {
         flowStrip.innerHTML = '';
         (p.flows || []).forEach(function (step, i) {
           var b = document.createElement('button');
-          b.className = 'flow-step';
-          b.type = 'button';
-          b.innerHTML = '<span class="fs-num">' + (i + 1) + '</span>'
-                      + '<span class="fs-label"></span>';
+          b.className = 'flow-step'; b.type = 'button';
+          b.setAttribute('data-cursor', 'link');
+          b.innerHTML = '<span class="fs-num">' + (i + 1) + '</span><span class="fs-label"></span>';
           b.querySelector('.fs-label').textContent = step.title;
           b.addEventListener('click', function () { selectFlow(i); });
           flowStrip.appendChild(b);
@@ -598,7 +745,7 @@
       }
       if (playBtn) playBtn.style.display = (p.flows && p.flows.length) ? '' : 'none';
 
-      detail.innerHTML = '<p class="bp-hint">Play the flow, pick a step, or click any node to inspect it.</p>';
+      detail.innerHTML = '<p class="bp-hint">Play the flow, pick a step, or select any node.</p>';
     }
 
     function animate() {
@@ -618,7 +765,6 @@
       raf = requestAnimationFrame(animate);
     }
 
-    // tabs
     $$('.bp-tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
         $$('.bp-tab').forEach(function (t) {
@@ -633,7 +779,7 @@
 
     if (playBtn) {
       playBtn.addEventListener('click', function () {
-        if (playTimer) { stopPlay(); } else { startPlay(); }
+        if (playTimer) stopPlay(); else startPlay();
       });
     }
 
@@ -646,7 +792,6 @@
       });
     }
 
-    // expose for the terminal's `open` command
     window.__bpShow = function (key) {
       var tab = $('.bp-tab[data-proj="' + key + '"]');
       if (tab) tab.click();
@@ -654,39 +799,46 @@
   }
 
   /* ---------------------------------------------------------
-     6. Skills
+     9. Stack
      --------------------------------------------------------- */
   var SKILLS = [
-    { icon: '☁', title: 'Cloud & Infrastructure', tags: ['AWS Lambda','API Gateway','S3','CloudFront','RDS','Cognito','VPC','KMS','IAM','CloudWatch','EKS','SNS','SES','NAT Gateway','Azure','GCP fundamentals','Serverless design','Multi-AZ / HA','Docker','Kubernetes','REST APIs'] },
-    { icon: '🛡', title: 'Security Operations',    tags: ['Splunk','Wazuh','IBM QRadar','MITRE ATT&CK','IOC analysis','Threat hunting','Incident response','SOAR (Shuffle)','TheHive','Vulnerability assessment','Penetration testing'] },
-    { icon: '📋', title: 'Governance & Frameworks',tags: ['NIST CSF','ISO 27001','CIS Controls','GDPR','AWS Well-Architected','Zero Trust','RBAC','Least privilege'] },
-    { icon: '🖥', title: 'Systems & Support',      tags: ['Windows','Linux','Microsoft 365','Active Directory','Endpoint support','Ticketing & SLA','SSO & MFA','Runbook & KB authoring'] },
-    { icon: '🌐', title: 'Networking',             tags: ['TCP/IP','DNS','DHCP','VPN','Firewalls'] }
+    { title: 'Cloud & Infrastructure', tags: ['AWS Lambda','API Gateway','S3','CloudFront','RDS','Cognito','VPC','KMS','IAM','CloudWatch','EKS','SNS','SES','NAT Gateway','Azure','GCP fundamentals','Serverless design','Multi-AZ / HA','Docker','Kubernetes','REST APIs'] },
+    { title: 'Security Operations',    tags: ['Splunk','Wazuh','IBM QRadar','MITRE ATT&CK','IOC analysis','Threat hunting','Incident response','SOAR (Shuffle)','TheHive','Vulnerability assessment','Penetration testing'] },
+    { title: 'Governance & Frameworks',tags: ['NIST CSF','ISO 27001','CIS Controls','GDPR','AWS Well-Architected','Zero Trust','RBAC','Least privilege'] },
+    { title: 'Systems & Support',      tags: ['Windows','Linux','Microsoft 365','Active Directory','Endpoint support','Ticketing & SLA','SSO & MFA','Runbook & KB authoring'] },
+    { title: 'Networking',             tags: ['TCP/IP','DNS','DHCP','VPN','Firewalls'] }
   ];
 
-  function initSkills() {
-    var grid = $('#skills-grid');
-    if (!grid) return;
-    SKILLS.forEach(function (g) {
-      var box = document.createElement('div');
-      box.className = 'sk-group reveal';
-      var h = document.createElement('h3');
-      h.innerHTML = '<span class="sk-ico">' + g.icon + '</span>';
-      h.appendChild(document.createTextNode(g.title));
+  function initStack() {
+    var box = $('#stack-index');
+    if (!box) return;
+    SKILLS.forEach(function (g, i) {
+      var row = document.createElement('div');
+      row.className = 'stack-row';
+
+      var no = document.createElement('span');
+      no.className = 'sr-no';
+      no.textContent = String(i + 1).padStart(2, '0');
+
+      var name = document.createElement('span');
+      name.className = 'sr-name';
+      name.textContent = g.title.toUpperCase();
+
       var tags = document.createElement('div');
-      tags.className = 'sk-tags';
+      tags.className = 'sr-tags';
       g.tags.forEach(function (t) {
         var s = document.createElement('span');
-        s.className = 'sk-tag'; s.textContent = t;
+        s.textContent = t;
         tags.appendChild(s);
       });
-      box.appendChild(h); box.appendChild(tags);
-      grid.appendChild(box);
+
+      row.appendChild(no); row.appendChild(name); row.appendChild(tags);
+      box.appendChild(row);
     });
   }
 
   /* ---------------------------------------------------------
-     7. Interactive terminal
+     10. Terminal
      --------------------------------------------------------- */
   function initTerminal() {
     var body = $('#term-body'), input = $('#term-input');
@@ -702,7 +854,6 @@
       body.scrollTop = body.scrollHeight;
       return d;
     }
-
     function esc(s) {
       return String(s).replace(/[&<>"']/g, function (c) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -714,7 +865,7 @@
         line('<span class="t-key">Available commands</span>');
         [['whoami','who is this'],['about','the short version'],
          ['experience','where I have worked'],['projects','what I have built'],
-         ['open <name>','load a project diagram (easyshop · soar · acme)'],
+         ['open <name>','load a diagram (easyshop · soar · acme)'],
          ['skills','the stack'],['education','degrees and certificates'],
          ['certs','certifications'],['contact','how to reach me'],
          ['resume','how to get the PDF'],['neofetch','system info'],
@@ -724,18 +875,15 @@
                + '<span class="t-dim">' + ' '.repeat(Math.max(1, 16 - c[0].length)) + esc(c[1]) + '</span>');
           });
       },
-
       whoami: function () {
         line('<span class="t-ok">Dhruv Patel</span> — cloud &amp; security engineer, Toronto ON');
         line('<span class="t-dim">Authorized to work in Canada. Open to cloud and security roles.</span>');
       },
-
       about: function () {
         line('Started in a SOC writing SIEM correlation rules. Moved to L1 support,');
         line('where I learned most outages are configuration, not code. Now I build');
         line('on AWS — serverless, multi-AZ, least privilege, security designed in.');
       },
-
       experience: function () {
         line('<span class="t-key">Asite Solutions</span> <span class="t-dim">— Technical Support Engineer L1 · Oct 2024–Mar 2026</span>');
         line('  SaaS troubleshooting, SSO/MFA, SLA compliance, KB authoring.');
@@ -743,7 +891,6 @@
         line('<span class="t-key">Heritage Cyber World LLP</span> <span class="t-dim">— SOC Analyst · Jan 2023–Jun 2024</span>');
         line('  <span class="t-ok">-35%</span> false positives via 8+ correlation rules, <span class="t-ok">-40%</span> triage time.');
       },
-
       projects: function () {
         line('<span class="t-key">easyshop</span>  <span class="t-dim">Serverless e-commerce on AWS · Seneca capstone 2026</span>');
         line('          <span class="t-dim">11 Lambdas · Multi-AZ RDS · Cognito · Stripe · SES · $52.71 all-in</span>');
@@ -752,48 +899,41 @@
         line('');
         line('<span class="t-dim">Try:</span> open easyshop');
       },
-
       open: function (arg) {
         var key = (arg || '').toLowerCase();
         if (!key) { line('usage: open &lt;easyshop|soar|acme&gt;', 't-warn'); return; }
         if (!PROJECTS[key]) { line('no such project: ' + esc(key), 't-err'); return; }
         if (window.__bpShow) window.__bpShow(key);
         line('Loading <span class="t-key">' + esc(key) + '</span> architecture…', 't-ok');
-        var target = document.getElementById('projects');
+        var target = document.getElementById('systems');
         if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
       },
-
       skills: function () {
         SKILLS.forEach(function (g) {
           line('<span class="t-key">' + esc(g.title) + '</span>');
           line('  <span class="t-dim">' + esc(g.tags.join(' · ')) + '</span>');
         });
       },
-
       education: function () {
         line('<span class="t-key">Seneca Polytechnic</span> <span class="t-dim">· PG Cert, Cloud Architecture &amp; Automation · 2025–2026</span>');
         line('<span class="t-key">York University</span>    <span class="t-dim">· PG Dip, Cybersecurity Operations · 2024–2025</span>');
         line('<span class="t-key">Ganpat University</span>  <span class="t-dim">· B.Tech CSE (Cybersecurity) · 2020–2024</span>');
       },
-
       certs: function () {
         line('<span class="t-ok">✓</span> AWS Certified Cloud Practitioner <span class="t-dim">(2026)</span>');
         line('<span class="t-ok">✓</span> IBM IT System Log Analyzer <span class="t-dim">(2024)</span>');
         line('<span class="t-ok">✓</span> Skills Ontario Cybersecurity Competition <span class="t-dim">(2026)</span>');
         line('<span class="t-dim">  labs: Amazon EKS · Azure P2S VPN · IAM hardening · AWS security architecture</span>');
       },
-
       contact: function () {
         line('<span class="t-key">email</span>     <a href="mailto:Dhruv123.dp47@gmail.com">Dhruv123.dp47@gmail.com</a>');
         line('<span class="t-key">linkedin</span>  <a href="https://linkedin.com/in/patel-dhruv-50455b1b9" target="_blank" rel="noopener">in/patel-dhruv-50455b1b9</a>');
         line('<span class="t-key">location</span>  Toronto, ON <span class="t-dim">(GTA or remote in Canada)</span>');
       },
-
       resume: function () {
         line('Email me and I will send the PDF tailored to the role.', 't-dim');
         line('<a href="mailto:Dhruv123.dp47@gmail.com?subject=Resume%20request">Dhruv123.dp47@gmail.com</a>');
       },
-
       neofetch: function () {
         var rows = [
           ['OS',       'Cloud Architecture & Automation (Seneca)'],
@@ -811,40 +951,28 @@
           line('<span class="t-key">' + esc(art) + '</span>  <span class="t-key">' + r[0] + '</span><span class="t-dim">: ' + esc(r[1]) + '</span>');
         });
       },
-
       ls: function () {
-        line('<span class="t-key">about/  experience/  projects/  terminal/  skills/  contact/</span>');
+        line('<span class="t-key">index/  work/  systems/  shell/  stack/  contact/</span>');
       },
-
       clear: function () { body.innerHTML = ''; },
-
       sudo: function () {
         line('Nice try. <span class="t-dim">This incident has been logged. (It has not.)</span>', 't-warn');
       },
-
-      exit: function () {
-        line('There is no exit. Scroll up instead.', 't-dim');
-      },
-
+      exit: function () { line('There is no exit. Scroll up instead.', 't-dim'); },
       date: function () { line(new Date().toString(), 't-dim'); }
     };
 
     function run(raw) {
       var trimmed = raw.trim();
-      line('<span class="t-ok">dhruv@portfolio</span><span class="t-key">:~$</span> <span class="t-cmd">' + esc(trimmed) + '</span>');
+      line('<span class="t-ok">dhruv@portfolio</span><span class="t-dim">:~$</span> <span class="t-cmd">' + esc(trimmed) + '</span>');
       if (!trimmed) return;
-
       history.unshift(trimmed); hIdx = -1;
 
       var parts = trimmed.split(/\s+/);
       var cmd = parts[0].toLowerCase();
       var arg = parts.slice(1).join(' ');
 
-      if (cmd === 'cat' || cmd === 'cd') {
-        line(cmd + ': try a bare section name, or `help`', 't-dim');
-        return;
-      }
-
+      if (cmd === 'cat' || cmd === 'cd') { line(cmd + ': try a bare section name, or `help`', 't-dim'); return; }
       if (COMMANDS[cmd]) { COMMANDS[cmd](arg); }
       else {
         line('command not found: ' + esc(cmd), 't-err');
@@ -871,12 +999,10 @@
       }
     });
 
-    // clicking anywhere in the terminal focuses the input
     $('#term').addEventListener('click', function (e) {
       if (e.target.tagName !== 'A') input.focus();
     });
 
-    // boot banner, typed out once the section is first seen
     var booted = false;
     function boot() {
       if (booted) return;
@@ -903,33 +1029,25 @@
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (e) { if (e.isIntersecting) { boot(); io.disconnect(); } });
       }, { threshold: 0.25 });
-      io.observe($('#terminal'));
+      io.observe($('#shell'));
     } else { boot(); }
-  }
-
-  /* ---------------------------------------------------------
-     util
-     --------------------------------------------------------- */
-  function debounce(fn, ms) {
-    var t;
-    return function () {
-      var a = arguments, c = this;
-      clearTimeout(t);
-      t = setTimeout(function () { fn.apply(c, a); }, ms);
-    };
   }
 
   /* ---------------------------------------------------------
      boot
      --------------------------------------------------------- */
   function init() {
-    initGrid();
-    initTyped();
-    initSkills();
+    initLoader();
+    initFlow();
+    initFit();
+    initRoom();
+    initTicker();
+    initStack();
     initBlueprint();
     initTerminal();
     initChrome();
     initScroll();
+    initScramble();
   }
 
   if (document.readyState === 'loading') {
