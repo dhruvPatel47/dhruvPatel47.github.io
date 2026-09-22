@@ -60,139 +60,6 @@
   }
 
   /* ---------------------------------------------------------
-     2. Hero flow field — layered contour lines
-     --------------------------------------------------------- */
-  function initFlow() {
-    var cv = $('#flow');
-    if (!cv) return;
-    var ctx = cv.getContext('2d');
-    var w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var t = 0, raf = null;
-
-    function resize() {
-      w = cv.clientWidth; h = cv.clientHeight;
-      cv.width = w * dpr; cv.height = h * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (reduceMotion) draw();
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, w, h);
-      t += 0.0045;
-
-      var rows = Math.max(26, Math.round(h / 13));
-      var step = Math.max(6, Math.round(w / 190));
-
-      for (var r = 0; r < rows; r++) {
-        var baseY = (r / rows) * h;
-        // Lines fade toward the bottom so the type stays dominant.
-        var fade = 1 - (r / rows) * 0.55;
-        ctx.beginPath();
-        for (var x = 0; x <= w; x += step) {
-          var nx = x / w, ny = r / rows;
-          var y = baseY
-            + Math.sin(nx * 5.4 + t * 1.5 + ny * 3.1) * 26 * fade
-            + Math.sin(nx * 11.3 - t * 2.1 + ny * 6.7) * 11 * fade
-            + Math.cos(nx * 2.2 + t * 0.8 - ny * 1.9) * 18 * fade;
-          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = 'rgba(204,255,0,' + (0.34 * fade).toFixed(4) + ')';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-      if (!reduceMotion) raf = requestAnimationFrame(draw);
-    }
-
-    resize();
-    window.addEventListener('resize', debounce(resize, 180));
-    if (reduceMotion) return;
-    draw();
-
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) { cancelAnimationFrame(raf); raf = null; }
-      else if (!raf) { raf = requestAnimationFrame(draw); }
-    });
-  }
-
-  /* ---------------------------------------------------------
-     3. Perspective room — grid lines converging on a vanishing point
-     --------------------------------------------------------- */
-  function initRoom() {
-    var svg = $('#room');
-    if (!svg) return;
-    var NS = 'http://www.w3.org/2000/svg';
-    var vx = 0.5, vy = 0.5, tx = 0.5, ty = 0.5, raf = null;
-
-    function build() {
-      var box = svg.getBoundingClientRect();
-      var W = box.width, H = box.height;
-      if (!W || !H) return;
-      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-      svg.textContent = '';
-
-      var px = W * vx, py = H * vy;
-      var frag = document.createDocumentFragment();
-
-      function line(x1, y1, x2, y2, op) {
-        var l = document.createElementNS(NS, 'line');
-        l.setAttribute('x1', x1); l.setAttribute('y1', y1);
-        l.setAttribute('x2', x2); l.setAttribute('y2', y2);
-        l.setAttribute('stroke', ACID);
-        l.setAttribute('stroke-opacity', op);
-        l.setAttribute('stroke-width', '1');
-        frag.appendChild(l);
-      }
-
-      // rays from the frame edge to the vanishing point
-      var N = 16;
-      for (var i = 0; i <= N; i++) {
-        var f = i / N;
-        line(f * W, 0, px, py, 0.13);
-        line(f * W, H, px, py, 0.13);
-        line(0, f * H, px, py, 0.13);
-        line(W, f * H, px, py, 0.13);
-      }
-
-      // concentric frames stepping back toward the vanishing point
-      for (var d = 1; d <= 7; d++) {
-        var k = Math.pow(d / 8, 1.85);
-        var x1 = px + (0 - px) * (1 - k), y1 = py + (0 - py) * (1 - k);
-        var x2 = px + (W - px) * (1 - k), y2 = py + (H - py) * (1 - k);
-        var rect = document.createElementNS(NS, 'rect');
-        rect.setAttribute('x', Math.min(x1, x2)); rect.setAttribute('y', Math.min(y1, y2));
-        rect.setAttribute('width', Math.abs(x2 - x1)); rect.setAttribute('height', Math.abs(y2 - y1));
-        rect.setAttribute('fill', 'none');
-        rect.setAttribute('stroke', ACID);
-        rect.setAttribute('stroke-opacity', 0.16 - d * 0.014);
-        rect.setAttribute('stroke-width', '1');
-        frag.appendChild(rect);
-      }
-
-      svg.appendChild(frag);
-    }
-
-    build();
-    window.addEventListener('resize', debounce(build, 200));
-
-    if (reduceMotion || !window.matchMedia('(pointer:fine)').matches) return;
-
-    // The vanishing point drifts toward the pointer — subtle parallax.
-    window.addEventListener('mousemove', function (e) {
-      tx = 0.5 + (e.clientX / window.innerWidth - 0.5) * 0.22;
-      ty = 0.5 + (e.clientY / window.innerHeight - 0.5) * 0.22;
-    });
-
-    (function follow() {
-      var dx = tx - vx, dy = ty - vy;
-      if (Math.abs(dx) > 0.0007 || Math.abs(dy) > 0.0007) {
-        vx += dx * 0.05; vy += dy * 0.05;
-        build();
-      }
-      raf = requestAnimationFrame(follow);
-    })();
-  }
-
-  /* ---------------------------------------------------------
      3b. Fit the giant type edge to edge
      --------------------------------------------------------- */
   var scrambling = 0;
@@ -341,9 +208,16 @@
         requestAnimationFrame(follow);
       })();
 
+      var curLabel = $('#cursor-label');
       document.addEventListener('mouseover', function (e) {
         var t = e.target.closest('[data-cursor="link"], a, button, input');
         cur.classList.toggle('on', !!t);
+        if (curLabel) {
+          // Nearest ancestor carrying a label wins, so a link inside a
+          // labelled card still shows the card's verb.
+          var labelled = e.target.closest('[data-label]');
+          curLabel.textContent = (t && labelled) ? labelled.getAttribute('data-label') : '';
+        }
       });
     }
 
@@ -1038,9 +912,7 @@
      --------------------------------------------------------- */
   function init() {
     initLoader();
-    initFlow();
     initFit();
-    initRoom();
     initTicker();
     initStack();
     initBlueprint();

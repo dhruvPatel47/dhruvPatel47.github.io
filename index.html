@@ -30,7 +30,9 @@
   </div>
 </div>
 
-<div class="cursor" id="cursor" aria-hidden="true"><i></i></div>
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<div class="cursor" id="cursor" aria-hidden="true"><i></i><span class="cursor-label" id="cursor-label"></span></div>
 <div class="noise" aria-hidden="true"></div>
 <div class="vign" aria-hidden="true"></div>
 
@@ -58,8 +60,6 @@
 
 <!-- ============ HERO ============ -->
 <section class="hero" id="hero">
-  <canvas id="flow" class="flow" aria-hidden="true"></canvas>
-
   <div class="rule rule-top">
     <span>N 43.7764°</span><span>W 79.2318°</span><span>SCARBOROUGH / GTA</span>
     <span>EST. 2020</span><span id="clock">--:--:--</span>
@@ -98,9 +98,7 @@
 </div>
 
 <!-- ============ ABOUT / PERSPECTIVE ROOM ============ -->
-<section class="section room-section" id="about">
-  <svg class="room" id="room" aria-hidden="true" preserveAspectRatio="none"></svg>
-
+<section class="section" id="about">
   <div class="room-content">
     <div class="sec-head">
       <span class="sec-idx">01</span>
@@ -156,7 +154,7 @@
       <span class="sec-meta">2023 — 2026</span>
     </div>
 
-    <article class="job" data-cursor="link">
+    <article class="job" data-cursor="link" data-label="ROLE">
       <div class="job-bar">
         <span class="job-no">01</span>
         <h4 class="job-name">ASITE SOLUTIONS</h4>
@@ -173,7 +171,7 @@
       </div>
     </article>
 
-    <article class="job" data-cursor="link">
+    <article class="job" data-cursor="link" data-label="ROLE">
       <div class="job-bar">
         <span class="job-no">02</span>
         <h4 class="job-name">HERITAGE CYBER WORLD</h4>
@@ -207,9 +205,9 @@
     </p>
 
     <div class="bp-switch" role="tablist" aria-label="Select project">
-      <button role="tab" class="bp-tab active" data-proj="easyshop" aria-selected="true" data-cursor="link">EASYSHOP</button>
-      <button role="tab" class="bp-tab" data-proj="soar" aria-selected="false" data-cursor="link">SOAR PIPELINE</button>
-      <button role="tab" class="bp-tab" data-proj="acme" aria-selected="false" data-cursor="link">ACME REDESIGN</button>
+      <button role="tab" class="bp-tab active" data-proj="easyshop" aria-selected="true" data-cursor="link" data-label="OPEN">EASYSHOP</button>
+      <button role="tab" class="bp-tab" data-proj="soar" aria-selected="false" data-cursor="link" data-label="OPEN">SOAR PIPELINE</button>
+      <button role="tab" class="bp-tab" data-proj="acme" aria-selected="false" data-cursor="link" data-label="OPEN">ACME REDESIGN</button>
     </div>
 
     <div class="panel">
@@ -222,7 +220,7 @@
       <p class="bp-blurb" id="bp-blurb"></p>
 
       <div class="bp-flowbar">
-        <button class="bp-play" id="bp-play" type="button" data-cursor="link">▶ PLAY FLOW</button>
+        <button class="bp-play" id="bp-play" type="button" data-cursor="link" data-label="PLAY">▶ PLAY FLOW</button>
         <div class="bp-flow" id="bp-flow" role="group" aria-label="Request journey steps"></div>
       </div>
 
@@ -314,12 +312,12 @@
       Authorized to work in Canada.
     </p>
 
-    <a class="big-link" href="mailto:Dhruv123.dp47@gmail.com" data-cursor="link">
+    <a class="big-link" href="mailto:Dhruv123.dp47@gmail.com" data-cursor="link" data-label="MAIL">
       <span class="bl-k">EMAIL</span>
       <span class="bl-v" data-scramble>Dhruv123.dp47@gmail.com</span>
       <span class="bl-ar" aria-hidden="true">↗</span>
     </a>
-    <a class="big-link" href="https://linkedin.com/in/patel-dhruv-50455b1b9" target="_blank" rel="noopener noreferrer" data-cursor="link">
+    <a class="big-link" href="https://linkedin.com/in/patel-dhruv-50455b1b9" target="_blank" rel="noopener noreferrer" data-cursor="link" data-label="VISIT">
       <span class="bl-k">LINKEDIN</span>
       <span class="bl-v" data-scramble>in/patel-dhruv</span>
       <span class="bl-ar" aria-hidden="true">↗</span>
@@ -342,6 +340,22 @@
   </div>
 </footer>
 
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+  import { initScene } from './js/scene.js';
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const canvas = document.getElementById('gl');
+  try {
+    const s = initScene({ canvas, reduceMotion: reduce });
+    if (s) { document.body.classList.add('gl-on'); window.__scene = s; }
+  } catch (err) {
+    // No WebGL, blocked context, or a CDN that never answered: the flat
+    // design underneath is the fallback, so just leave it alone.
+    console.warn('3D scene unavailable:', err);
+  }
+</script>
 <script src="js/main.js"></script>
 </body>
 </html>
