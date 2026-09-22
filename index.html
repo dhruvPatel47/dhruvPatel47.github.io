@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dhruv Patel — Cloud &amp; Security</title>
+<meta name="description" content="Dhruv Patel — Cloud and security engineer in Toronto. AWS serverless architecture, SOC operations, and infrastructure automation.">
+<meta name="theme-color" content="#05070d">
+
+<meta property="og:title" content="Dhruv Patel — Cloud &amp; Security">
+<meta property="og:description" content="Cloud and security engineer in Toronto. AWS serverless architecture, SOC operations, infrastructure automation.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2305070d'/><text y='.9em' x='50%25' text-anchor='middle' font-size='62' font-family='monospace' fill='%2300e5ff'>D</text></svg>">
+</head>
+<body>
+
+<div class="grid-bg" aria-hidden="true"><canvas id="grid-canvas"></canvas></div>
+<div class="scanlines" aria-hidden="true"></div>
+<div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<header class="nav" id="nav">
+  <a href="#hero" class="nav-brand">
+    <span class="brand-bracket">[</span>DP<span class="brand-bracket">]</span>
+    <span class="brand-status" aria-hidden="true"></span>
+  </a>
+  <nav class="nav-links" aria-label="Main">
+    <a href="#about" data-nav>about</a>
+    <a href="#experience" data-nav>experience</a>
+    <a href="#projects" data-nav>projects</a>
+    <a href="#terminal" data-nav>terminal</a>
+    <a href="#skills" data-nav>skills</a>
+    <a href="#contact" data-nav>contact</a>
+  </nav>
+  <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<main id="main">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="hero">
+  <div class="hero-inner">
+    <p class="hero-kicker reveal">
+      <span class="pulse-dot" aria-hidden="true"></span>
+      Toronto, ON &middot; open to cloud &amp; security roles
+    </p>
+
+    <h1 class="hero-name reveal" data-glitch="DHRUV PATEL">DHRUV PATEL</h1>
+
+    <div class="hero-role reveal">
+      <span class="prompt-sym" aria-hidden="true">&gt;</span>
+      <span id="typed-role" class="typed"></span><span class="caret" aria-hidden="true"></span>
+    </div>
+
+    <p class="hero-blurb reveal">
+      I build cloud infrastructure that stays up and stays defensible — AWS serverless
+      architecture with the security controls designed in from the start, not bolted on after.
+      Three years across SOC operations and technical support taught me what breaks in
+      production, and why.
+    </p>
+
+    <div class="hero-cta reveal">
+      <a href="#projects" class="btn btn-primary">
+        <span>View the work</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="#contact" class="btn btn-ghost">Get in touch</a>
+    </div>
+
+    <dl class="hero-stats reveal">
+      <div class="stat"><dt>Years in the field</dt><dd><span class="counter" data-target="3">0</span>+</dd></div>
+      <div class="stat"><dt>False positives cut</dt><dd><span class="counter" data-target="35">0</span>%</dd></div>
+      <div class="stat"><dt>Triage time cut</dt><dd><span class="counter" data-target="60">0</span>%</dd></div>
+      <div class="stat"><dt>Lambda functions shipped</dt><dd><span class="counter" data-target="11">0</span></dd></div>
+    </dl>
+  </div>
+
+  <a href="#about" class="scroll-hint" aria-label="Scroll to about">
+    <span class="mouse" aria-hidden="true"><span class="wheel"></span></span>
+  </a>
+</section>
+
+<!-- ============ ABOUT ============ -->
+<section class="section" id="about">
+  <div class="container">
+    <h2 class="section-title reveal"><span class="sec-num">01</span> About</h2>
+
+    <div class="about-grid">
+      <div class="about-text reveal">
+        <p class="lead">
+          I moved from monitoring other people's infrastructure to designing my own.
+        </p>
+        <p>
+          I started in a SOC, reading log data across multi-source enterprise environments
+          and writing the correlation rules that decide what a human actually looks at. Then
+          two years as an L1 support engineer, where I was the first person a customer reached
+          when SSO broke at 9am — the place you learn that most outages are configuration, not
+          code.
+        </p>
+        <p>
+          Now I build on AWS. My capstone was a full serverless e-commerce platform: custom VPC
+          across two availability zones, Multi-AZ RDS with automatic failover, eleven Lambda
+          functions behind API Gateway, Cognito for auth, KMS for encryption at rest — and the
+          whole thing ran under <strong>$52</strong> because cost is an architecture decision
+          too.
+        </p>
+        <p>
+          Two postgraduate credentials in Ontario, one in cloud architecture and one in
+          cybersecurity operations, on top of a computer science degree specialised in security.
+          I'm based in Scarborough and looking for cloud or security work across the GTA or remote.
+        </p>
+      </div>
+
+      <aside class="about-card reveal">
+        <div class="card-head">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="card-title">profile.json</span>
+        </div>
+        <pre class="code-block"><code><span class="c-p">{</span>
+  <span class="c-k">"name"</span>: <span class="c-s">"Dhruv Patel"</span>,
+  <span class="c-k">"location"</span>: <span class="c-s">"Toronto, ON"</span>,
+  <span class="c-k">"focus"</span>: <span class="c-p">[</span>
+    <span class="c-s">"cloud architecture"</span>,
+    <span class="c-s">"security operations"</span>,
+    <span class="c-s">"infrastructure automation"</span>
+  <span class="c-p">]</span>,
+  <span class="c-k">"cloud"</span>: <span class="c-s">"AWS"</span>,
+  <span class="c-k">"certified"</span>: <span class="c-s">"AWS Cloud Practitioner"</span>,
+  <span class="c-k">"authorized"</span>: <span class="c-b">true</span>,
+  <span class="c-k">"status"</span>: <span class="c-s">"open to work"</span>
+<span class="c-p">}</span></code></pre>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EXPERIENCE ============ -->
+<section class="section" id="experience">
+  <div class="container">
+    <h2 class="section-title reveal"><span class="sec-num">02</span> Experience</h2>
+
+    <div class="timeline">
+      <article class="tl-item reveal">
+        <div class="tl-marker" aria-hidden="true"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <h3>Technical Support Engineer <span class="tl-level">L1</span></h3>
+            <span class="tl-date">Oct 2024 — Mar 2026</span>
+          </div>
+          <p class="tl-org">Asite Solutions <span class="tl-loc">· Ahmedabad, India (remote from Toronto)</span></p>
+          <ul class="tl-points">
+            <li>First point of contact for customer-reported issues across ticketing, email and live chat; logged and categorised every request to hold SLA compliance.</li>
+            <li>Diagnosed SaaS failures end to end — login and access errors, account setup, SSO and MFA troubleshooting — working from documented runbooks and KB articles.</li>
+            <li>Reproduced and verified bugs before escalating to L2 with documentation clear enough to act on, and wrote KB articles that raised first-contact resolution.</li>
+          </ul>
+          <div class="tl-tags"><span>SSO / MFA</span><span>SLA</span><span>Ticketing</span><span>Runbooks</span><span>SaaS</span></div>
+        </div>
+      </article>
+
+      <article class="tl-item reveal">
+        <div class="tl-marker" aria-hidden="true"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <h3>SOC Analyst</h3>
+            <span class="tl-date">Jan 2023 — Jun 2024</span>
+          </div>
+          <p class="tl-org">Heritage Cyber World LLP <span class="tl-loc">· India</span></p>
+          <ul class="tl-points">
+            <li>Monitored and analysed log data across multi-source enterprise environments using SIEM tooling, turning raw events into structured findings for senior analysts and management.</li>
+            <li><strong>Cut false-positive alerts by 35%</strong> by engineering 8+ SIEM correlation rules, and <strong>reduced triage time 40%</strong> through detection-logic optimisation.</li>
+            <li>Improved SOC runbooks and SOPs, closing process gaps that were slowing incident response.</li>
+          </ul>
+          <div class="tl-tags"><span>SIEM</span><span>Splunk</span><span>Wazuh</span><span>QRadar</span><span>MITRE ATT&amp;CK</span><span>IOC analysis</span></div>
+        </div>
+      </article>
+    </div>
+
+    <h3 class="sub-title reveal">Education</h3>
+    <div class="edu-grid">
+      <div class="edu-card reveal">
+        <span class="edu-year">2025 — 2026</span>
+        <h4>Cloud Architecture &amp; Automation</h4>
+        <p>Postgraduate Certificate</p>
+        <span class="edu-school">Seneca Polytechnic, Ontario</span>
+      </div>
+      <div class="edu-card reveal">
+        <span class="edu-year">2024 — 2025</span>
+        <h4>Cybersecurity Operations</h4>
+        <p>Postgraduate Diploma</p>
+        <span class="edu-school">York University, Ontario</span>
+      </div>
+      <div class="edu-card reveal">
+        <span class="edu-year">2020 — 2024</span>
+        <h4>Computer Science Engineering</h4>
+        <p>B.Tech, Cybersecurity specialisation</p>
+        <span class="edu-school">Ganpat University, India</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROJECTS / BLUEPRINT ============ -->
+<section class="section" id="projects">
+  <div class="container">
+    <h2 class="section-title reveal"><span class="sec-num">03</span> Projects</h2>
+    <p class="section-lead reveal">
+      Live architecture. Click any node to see what it does and why it's there.
+    </p>
+
+    <div class="bp-switch reveal" role="tablist" aria-label="Select project architecture">
+      <button role="tab" class="bp-tab active" data-proj="easyshop" aria-selected="true">EasyShop</button>
+      <button role="tab" class="bp-tab" data-proj="soar" aria-selected="false">SOAR Incident Response</button>
+      <button role="tab" class="bp-tab" data-proj="acme" aria-selected="false">ACME Redesign</button>
+    </div>
+
+    <div class="blueprint reveal">
+      <div class="bp-head">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="card-title" id="bp-filename">easyshop-architecture.svg</span>
+        <span class="bp-live"><span class="pulse-dot"></span>live</span>
+      </div>
+      <div class="bp-stage">
+        <svg id="bp-svg" viewBox="0 0 900 480" role="img" aria-label="Interactive architecture diagram">
+          <defs>
+            <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.1"/>
+              <stop offset="50%" stop-color="#00e5ff" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#00e5ff" stop-opacity="0.1"/>
+            </linearGradient>
+            <filter id="nodeGlow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="6" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <g id="bp-edges"></g>
+          <g id="bp-packets"></g>
+          <g id="bp-nodes"></g>
+        </svg>
+      </div>
+      <div class="bp-detail" id="bp-detail" aria-live="polite">
+        <p class="bp-hint">Select a node above to inspect it.</p>
+      </div>
+    </div>
+
+    <div class="proj-meta reveal" id="proj-meta"></div>
+  </div>
+</section>
+
+<!-- ============ TERMINAL ============ -->
+<section class="section" id="terminal">
+  <div class="container">
+    <h2 class="section-title reveal"><span class="sec-num">04</span> Terminal</h2>
+    <p class="section-lead reveal">
+      A real shell. Type <code>help</code> to see what it knows, or just poke around.
+    </p>
+
+    <div class="term reveal" id="term">
+      <div class="term-head">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="card-title">dhruv@portfolio — bash</span>
+      </div>
+      <div class="term-body" id="term-body" tabindex="0" role="log" aria-label="Terminal output"></div>
+      <div class="term-inputline">
+        <span class="term-prompt">dhruv@portfolio<span class="term-path">:~$</span></span>
+        <input id="term-input" class="term-input" autocomplete="off" autocapitalize="off"
+               spellcheck="false" aria-label="Terminal input" placeholder="type a command…">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SKILLS ============ -->
+<section class="section" id="skills">
+  <div class="container">
+    <h2 class="section-title reveal"><span class="sec-num">05</span> Skills</h2>
+
+    <div class="skills-grid" id="skills-grid"></div>
+
+    <h3 class="sub-title reveal">Certifications</h3>
+    <div class="cert-row">
+      <div class="cert reveal"><span class="cert-badge">AWS</span><div><h4>Certified Cloud Practitioner</h4><span>2026</span></div></div>
+      <div class="cert reveal"><span class="cert-badge">IBM</span><div><h4>IT System Log Analyzer</h4><span>2024 · project completion</span></div></div>
+      <div class="cert reveal"><span class="cert-badge">SO</span><div><h4>Skills Ontario Cybersecurity Competition</h4><span>2026 · Seneca Polytechnic</span></div></div>
+      <div class="cert reveal"><span class="cert-badge">LAB</span><div><h4>Hands-on labs</h4><span>Amazon EKS · Azure P2S VPN · IAM hardening · AWS security architecture</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTACT ============ -->
+<section class="section section-contact" id="contact">
+  <div class="container">
+    <h2 class="section-title reveal"><span class="sec-num">06</span> Contact</h2>
+    <p class="contact-lead reveal">
+      Open to cloud and security roles across the Greater Toronto Area or remote in Canada.
+      Authorized to work in Canada.
+    </p>
+    <div class="contact-links">
+      <a class="contact-card reveal" href="mailto:Dhruv123.dp47@gmail.com">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 7l9 6 9-6M3 7v10a1 1 0 001 1h16a1 1 0 001-1V7a1 1 0 00-1-1H4a1 1 0 00-1 1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><span class="cl-label">Email</span><span class="cl-value">Dhruv123.dp47@gmail.com</span></div>
+      </a>
+      <a class="contact-card reveal" href="https://linkedin.com/in/patel-dhruv-50455b1b9" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6.94 5a1.94 1.94 0 11-3.88 0 1.94 1.94 0 013.88 0zM3.5 8.5h3v12h-3v-12zm5.5 0h2.9v1.6h.04c.4-.76 1.4-1.6 2.9-1.6 3.1 0 3.66 2 3.66 4.6v7.4h-3v-6.6c0-1.6-.03-3.6-2.2-3.6-2.2 0-2.5 1.7-2.5 3.5v6.7H9v-12z" fill="currentColor"/></svg>
+        <div><span class="cl-label">LinkedIn</span><span class="cl-value">in/patel-dhruv</span></div>
+      </a>
+      <a class="contact-card reveal" href="https://github.com/DHRUV_GITHUB_USERNAME" target="_blank" rel="noopener noreferrer" id="gh-link">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2a10 10 0 00-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 015 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85l-.01 2.75c0 .27.18.58.69.48A10 10 0 0012 2z" fill="currentColor"/></svg>
+        <div><span class="cl-label">GitHub</span><span class="cl-value">View repositories</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span>© <span id="year"></span> Dhruv Patel</span>
+    <span class="footer-meta">Built from scratch · no frameworks · <a href="https://pages.github.com/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></span>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>
