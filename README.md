@@ -1,46 +1,76 @@
 # Dhruv Patel — Portfolio
 
-Personal site: cloud and security engineering work, built as a single static page with no
-frameworks and no build step.
+Cloud and security engineering portfolio. A static site with **no framework and no build
+step** — open `index.html` and it runs.
 
-**Live:** https://USERNAME.github.io
+**Live:** https://dhruvpatel47.github.io
 
 ## What's in it
 
-- **Animated perspective grid** — canvas-rendered floor grid and a drifting node constellation,
-  redrawn each frame and paused when the tab is hidden.
-- **Live architecture blueprint** — three real project architectures (EasyShop on AWS, a
-  Shuffle/Wazuh/TheHive SOAR pipeline, and a NIST CSF post-ransomware redesign) drawn as SVG
-  node graphs with packets animating along the edges. Every node is clickable and explains
-  its own role.
-- **Working terminal** — a real command interpreter with history, tab completion and about a
-  dozen commands (`help`, `whoami`, `projects`, `open easyshop`, `neofetch`, …).
-- **Scroll-driven reveals**, animated counters, scrollspy navigation and a cursor glow.
+### A WebGL scene you scroll through
+
+Three.js loaded via import map. A fixed canvas sits behind the DOM, and scroll position
+drives a camera forward along a 900-unit track. Each section owns a set piece placed at that
+section's own scroll depth, so scrolling literally flies into it:
+
+| Section | Set piece |
+|---|---|
+| hero | wireframe icosahedron with orbiting satellites |
+| index | nested frames you pass straight through |
+| work | slabs drifting past on both sides |
+| systems | the EasyShop architecture as a 3D node graph, packets crawling the links |
+| shell | an instanced cube wall that ripples |
+| stack | 150 cubes on a Fibonacci sphere |
+| contact | concentric portal rings |
+
+Scene background and key light interpolate between neighbouring sections and publish the
+blended accent to CSS as `--scene-accent`, so the DOM recolours along with the camera.
+
+### Interactive architecture blueprints
+
+Three real systems drawn as SVG node graphs with packets animating along the edges. Every node
+is selectable and explains its own role. The **flow player** steps through the full customer
+journey — ten steps for EasyShop — lighting only the nodes and edges that step actually uses
+and dimming the rest.
+
+### A working terminal
+
+A real command interpreter with history, tab completion and about a dozen commands:
+`help`, `whoami`, `projects`, `open easyshop`, `neofetch`, `skills`, `certs`, `contact`.
+
+### Type and motion
+
+Giant display type measured at a probe size and scaled so each line spans its column edge to
+edge, re-fitted after web fonts land and on resize. Headings decode from glyph noise on
+entry, driven by wall clock rather than frame count so a throttled tab can never leave a
+visitor staring at a garbled name.
 
 ## Structure
 
 ```
 index.html      markup and content
-css/style.css   design tokens, layout, all motion
-js/main.js      grid, typed text, blueprint engine, terminal, scroll behaviour
+css/style.css   design tokens, layout, motion
+js/scene.js     the Three.js scene (ES module)
+js/main.js      loader, type fitting, scramble, blueprint, terminal, scroll
 ```
 
 ## Running locally
 
-No build step. Any static server works:
+No build step, but it needs to be served over HTTP because `scene.js` is an ES module:
 
 ```bash
 python -m http.server 8777
-# then open http://localhost:8777
+# open http://localhost:8777
 ```
 
-## Accessibility and performance
+## Degrading gracefully
 
-- Every animation is disabled under `prefers-reduced-motion`.
-- The blueprint nodes are keyboard-focusable and respond to Enter/Space.
-- Canvas and SVG animation loops stop when the tab is backgrounded.
-- Node counts scale with viewport area so phones stay smooth.
-- A print stylesheet strips the chrome so the page prints cleanly.
+- **No WebGL, or the CDN doesn't answer** — the scene is skipped and the flat design underneath
+  stands on its own. No blank page.
+- **`prefers-reduced-motion`** — one static frame, no animation loops anywhere.
+- **Backgrounded tab** — render loops stop rather than burning cycles.
+- **Keyboard** — blueprint nodes are focusable and respond to Enter/Space.
+- **Print** — a print stylesheet strips the scene and chrome so the page prints cleanly.
 
 ## Licence
 
