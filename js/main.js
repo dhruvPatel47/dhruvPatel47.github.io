@@ -776,9 +776,17 @@
         d.appendChild(a); d.appendChild(b); out.appendChild(d);
       }
 
+      // Sub-1 values must not round to a bare "0" — at low traffic that
+      // reads as broken rather than as "almost nothing".
+      function cap(n) {
+        if (n < 1) return '<1';
+        if (n < 10) return n.toFixed(1);
+        return Math.round(n).toLocaleString();
+      }
+
       row('Requests / day', Math.round(perDay).toLocaleString());
-      row('Peak concurrency', Math.round(r.concurrency).toLocaleString() + ' functions');
-      row('DB connections needed', Math.round(r.connections).toLocaleString()
+      row('Peak concurrency', cap(r.concurrency) + ' functions');
+      row('DB connections needed', cap(r.connections)
             + ' / ' + p.scale.rdsMaxConnections, r.bottleneck ? 'warn' : '');
       row('Lambda + API Gateway', money(r.lambda + r.api) + ' /mo');
       row('CloudFront transfer', money(r.cf) + ' /mo');
