@@ -219,12 +219,45 @@
 
       <p class="bp-blurb" id="bp-blurb"></p>
 
-      <div class="bp-flowbar">
-        <button class="bp-play" id="bp-play" type="button" data-cursor="link" data-label="PLAY">▶ PLAY FLOW</button>
-        <div class="bp-flow" id="bp-flow" role="group" aria-label="Request journey steps"></div>
+      <div class="bp-modebar">
+        <div class="bp-modes" id="bp-modes" role="tablist" aria-label="Diagram mode">
+          <button class="bp-mode active" data-mode="flow"   role="tab" aria-selected="true"  data-cursor="link" data-label="VIEW">▶ FLOW</button>
+          <button class="bp-mode"        data-mode="break"  role="tab" aria-selected="false" data-cursor="link" data-label="VIEW">⚡ BREAK IT</button>
+          <button class="bp-mode"        data-mode="scale"  role="tab" aria-selected="false" data-cursor="link" data-label="VIEW">📈 SCALE</button>
+          <button class="bp-mode"        data-mode="versus" role="tab" aria-selected="false" data-cursor="link" data-label="VIEW">⚖ VS</button>
+        </div>
+        <button class="bp-sound" id="bp-sound" type="button" aria-pressed="false" data-cursor="link" data-label="AUDIO">🔇 SOUND OFF</button>
       </div>
 
-      <div class="bp-stage">
+      <div class="bp-panes" id="bp-panes">
+
+        <div class="bp-pane" data-pane="flow">
+          <div class="bp-flowbar">
+            <button class="bp-play" id="bp-play" type="button" data-cursor="link" data-label="PLAY">▶ PLAY FLOW</button>
+            <div class="bp-flow" id="bp-flow" role="group" aria-label="Request journey steps"></div>
+          </div>
+        </div>
+
+        <div class="bp-pane" data-pane="break" hidden>
+          <p class="pane-hint">Break your own architecture and watch what happens. Each failure reports what dies, what keeps serving, and which design decision paid for the difference.</p>
+          <div class="fail-buttons" id="fail-buttons" role="group" aria-label="Failure scenarios"></div>
+        </div>
+
+        <div class="bp-pane" data-pane="scale" hidden>
+          <p class="pane-hint">Drag traffic up and watch cost and capacity respond. Estimates use us-east-2 list prices — the shape of the curve is the point, not the cent.</p>
+          <label class="scale-label" for="scale-slider">TRAFFIC — 1 req/day to 10M req/day</label>
+          <input type="range" id="scale-slider" class="scale-slider" min="0" max="100" value="50" step="1" data-cursor="link" data-label="DRAG">
+          <div class="scale-out" id="scale-out"></div>
+        </div>
+
+        <div class="bp-pane" data-pane="versus" hidden>
+          <p class="pane-hint">The question every interviewer asks: why not just put it on a server?</p>
+          <div class="versus-out" id="versus-out"></div>
+        </div>
+
+      </div>
+
+      <div class="bp-stage" id="bp-stage">
         <svg id="bp-svg" viewBox="0 0 900 445" role="img" aria-label="Interactive architecture diagram">
           <defs>
             <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">

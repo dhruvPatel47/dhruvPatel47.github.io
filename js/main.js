@@ -369,7 +369,81 @@
           desc: 'The admin panel asks getUploadUrl for a presigned S3 URL, then the browser uploads the image straight to S3. The file never passes through Lambda — no size limit, no compute cost.' },
         { title: 'Everything is logged', path: ['lambda','cloudwatch'],
           desc: 'Every invocation writes to its own CloudWatch log group. Eleven functions, eleven log groups, no configuration needed.' }
-      ]
+      ],
+
+      /* Failure injection. Each scenario states what dies, what survives,
+         and which design decision paid for the difference. */
+      failures: [
+        { id: 'az', label: 'Kill AZ us-east-2a', verdict: 'survives',
+          state: { rds: 'failover', lambda: 'degraded' },
+          title: 'Availability-zone failure',
+          body: 'RDS promotes the standby in us-east-2b automatically. Lambda keeps executing in the surviving AZ’s private subnet, reaching the internet through that AZ’s NAT gateway. In-flight queries error; the next request reconnects.',
+          decision: 'Multi-AZ RDS, subnets in both zones, one NAT gateway per zone. That redundancy is most of the database line on the bill — this is what it buys.' },
+
+        { id: 'rds', label: 'Kill RDS primary', verdict: 'survives',
+          state: { rds: 'failover' },
+          title: 'Primary database instance lost',
+          body: 'Automatic failover to the standby, typically 60–120 seconds. Requests during the window fail; everything after succeeds against the promoted instance. No data loss — the standby is kept in sync synchronously.',
+          decision: 'Multi-AZ with automatic failover plus automated backups. A single-AZ instance here would have meant a restore from snapshot and real data loss.' },
+
+        { id: 'lambda', label: 'Throttle Lambda', verdict: 'degraded',
+          state: { lambda: 'degraded' }, severed: [['lambda','rds'],['lambda','ses'],['lambda','sns']],
+          title: 'Compute saturated',
+          body: 'Past the concurrency ceiling API Gateway returns 429. The API is effectively down — but the site is not: CloudFront keeps serving the front end from the edge, so visitors see a working page with failing data calls rather than nothing at all.',
+          decision: 'Static front end on S3 behind CloudFront, entirely independent of compute. Separating the two is why a compute incident degrades instead of blacking out.' },
+
+        { id: 'stripe', label: 'Stripe outage', verdict: 'degraded',
+          state: { stripe: 'dead' }, severed: [['lambda','stripe'],['customer','stripe']],
+          title: 'Payment provider unreachable',
+          body: 'Checkout fails. Browsing, login, order history and the admin panel are untouched, because payment is an outbound call from one function rather than something the rest of the system depends on.',
+          decision: 'Payment isolated behind createCheckoutSession. No Stripe SDK and no card data anywhere else in the codebase — which also keeps the PCI surface at zero.' },
+
+        { id: 'cognito', label: 'Cognito outage', verdict: 'down',
+          state: { cognito: 'dead' }, severed: [['cloudfront','cognito'],['cognito','apigw']],
+          title: 'Identity provider unreachable',
+          body: 'No new sign-ups, no logins, no token refresh. Sessions holding a valid JWT keep working until it expires; public browsing continues. Anything behind auth — checkout, admin — is unreachable.',
+          decision: 'This is the weakest point in the design and worth saying out loud: auth is a hard dependency with no fallback. Mitigating it properly means longer token lifetimes and a degraded read-only mode, neither of which I built.' },
+
+        { id: 'region', label: 'Lose the whole region', verdict: 'down',
+          state: { cloudfront: 'dead', s3: 'dead', apigw: 'dead', lambda: 'dead',
+                   rds: 'dead', cognito: 'dead', ses: 'dead', sns: 'dead', cloudwatch: 'dead' },
+          title: 'Full us-east-2 outage',
+          body: 'Everything goes. This is a single-region deployment and it does not survive losing the region.',
+          decision: 'A deliberate trade-off, not an oversight. Multi-region means cross-region read replicas, Route 53 health-check failover and roughly double the run rate. For a capstone with no revenue at stake that is the wrong spend — but I would rather show the limit than pretend it is not there.' }
+      ],
+
+      /* Rough monthly cost + capacity model. Figures are us-east-2 list
+         prices; the point is the shape of the curve, not the cent. */
+      scale: {
+        fixed: [
+          ['RDS db.t3.micro Multi-AZ', 25.0],
+          ['NAT gateways (2 × $0.045/hr)', 65.0],
+          ['Route 53 + misc', 1.0]
+        ],
+        lambdasPerRequest: 3,
+        avgDurationMs: 120,
+        memoryMb: 512,
+        pageWeightMb: 0.5,
+        peakFactor: 10,
+        rdsMaxConnections: 85,
+        accountConcurrency: 1000
+      },
+
+      /* The comparison an interviewer actually asks about. */
+      versus: {
+        a: 'What I built — serverless',
+        b: 'The obvious way — EC2 monolith',
+        rows: [
+          ['Cost at zero traffic', '$0 compute. You pay for the database and NAT only.', '~$15/mo for a t3.small that runs whether anyone visits or not.'],
+          ['Cost at 1M requests/day', 'Roughly $95/mo — and NAT gateways, not compute, are the driver.', 'Needs 2+ instances behind an ALB: ~$50/mo, plus the ALB.'],
+          ['Scaling to 10×', 'Automatic. The ceiling is RDS connections, not compute.', 'Auto Scaling group, AMI baking, health checks — all built by hand first.'],
+          ['AZ failure', 'Survives. Managed failover, nothing to configure.', 'Survives only if you already built the ASG and multi-AZ RDS.'],
+          ['Patching the OS', 'There is no OS.', 'Yours. Forever.'],
+          ['Deploy', 'Zip one function. The other ten keep running.', 'Restart the app. Everything goes at once unless you build blue/green.'],
+          ['First-request latency', '~180ms cold start, ~18ms warm.', 'Consistently fast. No cold starts.'],
+          ['Honest downsides', 'Cold starts, harder local testing, and real lock-in to AWS primitives.', 'Simpler to reason about and to run locally. Boring, which is sometimes correct.']
+        ]
+      }
     },
 
     soar: {
@@ -440,7 +514,7 @@
   var NODE_W = 128, NODE_H = 52;
 
   /* ---------------------------------------------------------
-     8. Blueprint engine
+     8. Blueprint engine — flow / break it / scale / versus
      --------------------------------------------------------- */
   function initBlueprint() {
     var svg = $('#bp-svg');
@@ -448,9 +522,12 @@
     var gEdges = $('#bp-edges'), gPackets = $('#bp-packets'), gNodes = $('#bp-nodes');
     var detail = $('#bp-detail'), metaBox = $('#proj-meta'), fileLabel = $('#bp-filename');
     var flowStrip = $('#bp-flow'), blurbBox = $('#bp-blurb'), playBtn = $('#bp-play');
+    var modeBar = $('#bp-modes'), panes = $('#bp-panes'), stage = $('#bp-stage');
     var NS = 'http://www.w3.org/2000/svg';
+
     var packets = [], raf = null, current = null;
-    var edgeMap = {}, activeFlow = -1, playTimer = null;
+    var edgeMap = {}, nodeMap = {}, activeFlow = -1, playTimer = null;
+    var mode = 'flow', activeFailure = null;
 
     function el(name, attrs) {
       var e = document.createElementNS(NS, name);
@@ -460,7 +537,38 @@
     function centre(n) { return { x: n.x + NODE_W / 2, y: n.y + NODE_H / 2 }; }
     function pairKey(a, b) { return a + '|' + b; }
 
-    /* Direction is ignored — an edge is "hot" if the step walks it either way. */
+    /* ---------- tiny synth: no audio files, muted by default ---------- */
+    var audio = (function () {
+      var ctx = null, on = false;
+      function ensure() {
+        if (!ctx && window.AudioContext) ctx = new AudioContext();
+        if (ctx && ctx.state === 'suspended') ctx.resume();
+        return ctx;
+      }
+      return {
+        get enabled() { return on; },
+        toggle: function () { on = !on; if (on) ensure(); return on; },
+        blip: function (freq, dur, type, gain) {
+          if (!on) return;
+          var c = ensure();
+          if (!c) return;
+          var o = c.createOscillator(), g = c.createGain();
+          o.type = type || 'sine';
+          o.frequency.value = freq;
+          // Short exponential decay — a tick, not a tone.
+          g.gain.setValueAtTime(gain || 0.05, c.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + (dur || 0.09));
+          o.connect(g); g.connect(c.destination);
+          o.start(); o.stop(c.currentTime + (dur || 0.09) + 0.02);
+        }
+      };
+    })();
+
+    function haptic(ms) {
+      if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} }
+    }
+
+    /* ---------- shared state helpers ---------- */
     function hotPairs(pathIds) {
       var set = {};
       for (var i = 0; i < pathIds.length - 1; i++) {
@@ -470,13 +578,31 @@
       return set;
     }
 
+    function clearNodeStates() {
+      $$('.bp-node', svg).forEach(function (g) {
+        g.classList.remove('dim', 'lit', 'sel', 'dead', 'degraded', 'failover');
+      });
+      Object.keys(edgeMap).forEach(function (k) {
+        edgeMap[k].path.classList.remove('hot', 'cold', 'severed');
+        if (edgeMap[k].packet) edgeMap[k].packet.classList.remove('hot', 'cold', 'severed');
+      });
+      $$('.bp-x', svg).forEach(function (x) { x.remove(); });
+    }
+
+    function markDead(id) {
+      var g = nodeMap[id];
+      if (!g) return;
+      var n = g.__node;
+      var x = el('g', { class: 'bp-x' });
+      x.appendChild(el('line', { x1: n.x + 8, y1: n.y + 8, x2: n.x + NODE_W - 8, y2: n.y + NODE_H - 8 }));
+      x.appendChild(el('line', { x1: n.x + NODE_W - 8, y1: n.y + 8, x2: n.x + 8, y2: n.y + NODE_H - 8 }));
+      gNodes.appendChild(x);
+    }
+
+    /* ---------- FLOW ---------- */
     function clearFlow() {
       activeFlow = -1;
-      $$('.bp-node', svg).forEach(function (g) { g.classList.remove('dim', 'lit'); });
-      Object.keys(edgeMap).forEach(function (k) {
-        edgeMap[k].path.classList.remove('hot', 'cold');
-        if (edgeMap[k].packet) edgeMap[k].packet.classList.remove('hot', 'cold');
-      });
+      clearNodeStates();
       $$('.flow-step', flowStrip).forEach(function (b) { b.classList.remove('active'); });
     }
 
@@ -491,12 +617,13 @@
 
       $$('.bp-node', svg).forEach(function (g) {
         var on = inPath[g.getAttribute('data-id')];
+        g.classList.remove('sel', 'dead', 'degraded', 'failover');
         g.classList.toggle('lit', !!on);
         g.classList.toggle('dim', !on);
-        g.classList.remove('sel');
       });
       Object.keys(edgeMap).forEach(function (k) {
         var on = !!hot[k];
+        edgeMap[k].path.classList.remove('severed');
         edgeMap[k].path.classList.toggle('hot', on);
         edgeMap[k].path.classList.toggle('cold', !on);
         if (edgeMap[k].packet) {
@@ -506,13 +633,13 @@
       });
       $$('.flow-step', flowStrip).forEach(function (b, i) { b.classList.toggle('active', i === idx); });
 
-      detail.innerHTML = '';
-      var n = document.createElement('p');
-      n.className = 'bp-role';
-      n.textContent = 'Step ' + (idx + 1) + ' of ' + p.flows.length;
-      var h = document.createElement('h4'); h.textContent = step.title;
-      var d = document.createElement('p'); d.textContent = step.desc;
-      detail.appendChild(n); detail.appendChild(h); detail.appendChild(d);
+      audio.blip(520 + idx * 40, 0.07, 'sine', 0.045);
+
+      report({
+        kicker: 'Step ' + (idx + 1) + ' of ' + p.flows.length,
+        title: step.title,
+        body: step.desc
+      });
 
       if (!fromPlayer) stopPlay();
     }
@@ -531,13 +658,251 @@
       }, 4200);
     }
 
+    /* ---------- BREAK IT ---------- */
+    function applyFailure(f) {
+      stopPlay();
+      clearFlow();
+      activeFailure = f ? f.id : null;
+
+      $$('.fail-btn', panes).forEach(function (b) {
+        b.classList.toggle('active', !!f && b.getAttribute('data-fail') === f.id);
+      });
+
+      if (!f) {
+        report({
+          kicker: 'Break it',
+          title: 'Nothing is broken',
+          body: 'Pick a failure above and the diagram will show what actually happens — what dies, what keeps serving, and which design decision made the difference.'
+        });
+        return;
+      }
+
+      var st = f.state || {};
+      Object.keys(st).forEach(function (id) {
+        var g = nodeMap[id];
+        if (!g) return;
+        g.classList.add(st[id]);
+        if (st[id] === 'dead') markDead(id);
+      });
+
+      // Edges touching a dead node are severed whether or not the
+      // scenario listed them — a dead node cannot carry traffic.
+      var deadIds = Object.keys(st).filter(function (id) { return st[id] === 'dead'; });
+      Object.keys(edgeMap).forEach(function (k) {
+        var ends = k.split('|');
+        var touchesDead = deadIds.indexOf(ends[0]) > -1 || deadIds.indexOf(ends[1]) > -1;
+        if (touchesDead) {
+          edgeMap[k].path.classList.add('severed');
+          if (edgeMap[k].packet) edgeMap[k].packet.classList.add('severed');
+        }
+      });
+      (f.severed || []).forEach(function (pair) {
+        var rec = edgeMap[pairKey(pair[0], pair[1])];
+        if (!rec) return;
+        rec.path.classList.add('severed');
+        if (rec.packet) rec.packet.classList.add('severed');
+      });
+
+      audio.blip(f.verdict === 'survives' ? 320 : 120, 0.28, 'sawtooth', 0.05);
+      haptic(f.verdict === 'down' ? [40, 60, 40] : 30);
+
+      report({
+        kicker: 'Break it',
+        title: f.title,
+        body: f.body,
+        verdict: f.verdict,
+        decision: f.decision
+      });
+    }
+
+    /* ---------- SCALE ---------- */
+    function money(n) {
+      return '$' + (n < 10 ? n.toFixed(2) : Math.round(n).toLocaleString());
+    }
+
+    function computeScale(p, perDay) {
+      var s = p.scale;
+      var invocations = perDay * s.lambdasPerRequest * 30;
+      var gbSeconds = invocations * (s.avgDurationMs / 1000) * (s.memoryMb / 1024);
+
+      var lambdaCost = (invocations / 1e6) * 0.20 + gbSeconds * 0.0000166667;
+      var apiCost = (perDay * 30 / 1e6) * 1.00;
+      var cfCost = (perDay * 30 * s.pageWeightMb / 1024) * 0.085;
+
+      var fixed = s.fixed.reduce(function (a, r) { return a + r[1]; }, 0);
+      var total = fixed + lambdaCost + apiCost + cfCost;
+
+      var rps = perDay / 86400;
+      var peakRps = rps * s.peakFactor;
+      var concurrency = peakRps * s.lambdasPerRequest * (s.avgDurationMs / 1000);
+      var connections = concurrency;
+
+      var bottleneck = null;
+      if (connections > s.rdsMaxConnections) {
+        bottleneck = {
+          what: 'RDS connections',
+          msg: 'Peak concurrency needs about ' + Math.round(connections) + ' database connections; db.t3.micro allows roughly ' + s.rdsMaxConnections + '. Past this point every Lambda fights for a connection and queries start timing out. The fix is RDS Proxy to pool them, or a bigger instance class.'
+        };
+      } else if (concurrency > s.accountConcurrency) {
+        bottleneck = {
+          what: 'Lambda concurrency',
+          msg: 'Peak concurrency exceeds the default account limit of ' + s.accountConcurrency + '. API Gateway starts returning 429 until the limit is raised.'
+        };
+      }
+
+      return {
+        total: total, fixed: fixed,
+        lambda: lambdaCost, api: apiCost, cf: cfCost,
+        rps: rps, peakRps: peakRps,
+        concurrency: concurrency, connections: connections,
+        bottleneck: bottleneck
+      };
+    }
+
+    function renderScale(perDay) {
+      var p = PROJECTS[current];
+      if (!p || !p.scale) return;
+      var r = computeScale(p, perDay);
+
+      var out = $('#scale-out');
+      if (!out) return;
+      out.innerHTML = '';
+
+      function row(k, v, cls) {
+        var d = document.createElement('div');
+        d.className = 'sc-row' + (cls ? ' ' + cls : '');
+        var a = document.createElement('span'); a.className = 'sc-k'; a.textContent = k;
+        var b = document.createElement('span'); b.className = 'sc-v'; b.textContent = v;
+        d.appendChild(a); d.appendChild(b); out.appendChild(d);
+      }
+
+      row('Requests / day', Math.round(perDay).toLocaleString());
+      row('Peak concurrency', Math.round(r.concurrency).toLocaleString() + ' functions');
+      row('DB connections needed', Math.round(r.connections).toLocaleString()
+            + ' / ' + p.scale.rdsMaxConnections, r.bottleneck ? 'warn' : '');
+      row('Lambda + API Gateway', money(r.lambda + r.api) + ' /mo');
+      row('CloudFront transfer', money(r.cf) + ' /mo');
+      row('Fixed (RDS + NAT)', money(r.fixed) + ' /mo');
+      row('Estimated total', money(r.total) + ' /mo', 'total');
+
+      var note = document.createElement('p');
+      note.className = 'sc-note';
+      if (r.bottleneck) {
+        note.classList.add('bad');
+        note.textContent = '⚠ Bottleneck — ' + r.bottleneck.what + '. ' + r.bottleneck.msg;
+      } else {
+        note.textContent = 'Headroom on every component. Note that NAT gateways and RDS are '
+          + 'fixed cost — at low traffic they are the entire bill, which is exactly what the '
+          + '$52.71 all-time figure reflects.';
+      }
+      out.appendChild(note);
+    }
+
+    /* ---------- VERSUS ---------- */
+    function renderVersus() {
+      var p = PROJECTS[current];
+      var box = $('#versus-out');
+      if (!box) return;
+      box.innerHTML = '';
+      if (!p || !p.versus) return;
+
+      var head = document.createElement('div');
+      head.className = 'vs-row vs-head';
+      head.innerHTML = '<span></span>';
+      var ha = document.createElement('span'); ha.textContent = p.versus.a;
+      var hb = document.createElement('span'); hb.textContent = p.versus.b;
+      head.appendChild(ha); head.appendChild(hb);
+      box.appendChild(head);
+
+      p.versus.rows.forEach(function (r) {
+        var d = document.createElement('div');
+        d.className = 'vs-row';
+        [r[0], r[1], r[2]].forEach(function (cell, i) {
+          var s = document.createElement('span');
+          if (i === 0) s.className = 'vs-k';
+          s.textContent = cell;
+          d.appendChild(s);
+        });
+        box.appendChild(d);
+      });
+    }
+
+    /* ---------- report panel ---------- */
+    function report(o) {
+      detail.innerHTML = '';
+      if (o.kicker) {
+        var k = document.createElement('p');
+        k.className = 'bp-role';
+        k.textContent = o.kicker;
+        detail.appendChild(k);
+      }
+      if (o.verdict) {
+        var v = document.createElement('span');
+        v.className = 'verdict v-' + o.verdict;
+        v.textContent = o.verdict === 'survives' ? 'SURVIVES'
+                      : o.verdict === 'degraded' ? 'DEGRADED' : 'DOWN';
+        detail.appendChild(v);
+      }
+      var h = document.createElement('h4'); h.textContent = o.title;
+      detail.appendChild(h);
+      var b = document.createElement('p'); b.textContent = o.body;
+      detail.appendChild(b);
+      if (o.decision) {
+        var d = document.createElement('p');
+        d.className = 'bp-decision';
+        d.innerHTML = '<span>DESIGN DECISION</span>';
+        d.appendChild(document.createTextNode(o.decision));
+        detail.appendChild(d);
+      }
+    }
+
+    /* ---------- mode switching ---------- */
+    function setMode(next) {
+      mode = next;
+      stopPlay();
+      clearFlow();
+      activeFailure = null;
+      $$('.fail-btn', panes).forEach(function (b) { b.classList.remove('active'); });
+
+      $$('.bp-mode', modeBar).forEach(function (b) {
+        var on = b.getAttribute('data-mode') === next;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      $$('.bp-pane', panes).forEach(function (pane) {
+        pane.hidden = pane.getAttribute('data-pane') !== next;
+      });
+
+      // The diagram is meaningless in the comparison view.
+      if (stage) stage.hidden = (next === 'versus');
+      if (detail) detail.hidden = (next === 'versus' || next === 'scale');
+
+      if (next === 'flow') {
+        report({ kicker: 'Flow', title: 'Follow a real request',
+                 body: 'Play it, or pick a step. The diagram dims to just the path that step actually uses.' });
+      } else if (next === 'break') {
+        applyFailure(null);
+      } else if (next === 'scale') {
+        var sl = $('#scale-slider');
+        renderScale(sliderToRequests(sl ? +sl.value : 50));
+      } else if (next === 'versus') {
+        renderVersus();
+      }
+    }
+
+    // Logarithmic: 1 req/day at 0, 10M at 100.
+    function sliderToRequests(v) {
+      return Math.pow(10, (v / 100) * 7);
+    }
+
+    /* ---------- render a project ---------- */
     function render(key) {
       var p = PROJECTS[key];
       if (!p) return;
       current = key;
 
       gEdges.textContent = ''; gPackets.textContent = ''; gNodes.textContent = '';
-      packets = []; edgeMap = {};
+      packets = []; edgeMap = {}; nodeMap = {};
       stopPlay();
       if (fileLabel) fileLabel.textContent = p.file;
 
@@ -575,16 +940,16 @@
         var sub = el('text', { x: n.x + NODE_W / 2, y: n.y + 38, 'text-anchor': 'middle', class: 'n-sub' });
         sub.textContent = n.sub;
         g.appendChild(lbl); g.appendChild(sub);
+        g.__node = n;
+        nodeMap[n.id] = g;
 
         function select() {
+          if (mode === 'break') return;   // failure state owns the diagram
+          stopPlay();
           clearFlow();
-          $$('.bp-node', svg).forEach(function (o) { o.classList.remove('sel'); });
           g.classList.add('sel');
-          detail.innerHTML = '';
-          var h = document.createElement('h4'); h.textContent = n.label;
-          var r = document.createElement('p'); r.className = 'bp-role'; r.textContent = n.role;
-          var d = document.createElement('p'); d.textContent = n.desc;
-          detail.appendChild(h); detail.appendChild(r); detail.appendChild(d);
+          audio.blip(700, 0.06, 'triangle', 0.04);
+          report({ kicker: n.role, title: n.label, body: n.desc });
         }
         g.addEventListener('click', select);
         g.addEventListener('keydown', function (e) {
@@ -617,16 +982,51 @@
           flowStrip.appendChild(b);
         });
       }
-      if (playBtn) playBtn.style.display = (p.flows && p.flows.length) ? '' : 'none';
 
-      detail.innerHTML = '<p class="bp-hint">Play the flow, pick a step, or select any node.</p>';
+      // Failure buttons
+      var failBox = $('#fail-buttons');
+      if (failBox) {
+        failBox.innerHTML = '';
+        (p.failures || []).forEach(function (f) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'fail-btn';
+          b.setAttribute('data-fail', f.id);
+          b.setAttribute('data-cursor', 'link');
+          b.setAttribute('data-label', 'BREAK');
+          b.textContent = f.label;
+          b.addEventListener('click', function () {
+            applyFailure(activeFailure === f.id ? null : f);
+          });
+          failBox.appendChild(b);
+        });
+        var reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'fail-btn reset';
+        reset.setAttribute('data-cursor', 'link');
+        reset.textContent = '↺ REPAIR';
+        reset.addEventListener('click', function () { applyFailure(null); });
+        failBox.appendChild(reset);
+      }
+
+      // Which modes this project supports
+      $$('.bp-mode', modeBar).forEach(function (b) {
+        var m = b.getAttribute('data-mode');
+        var ok = m === 'flow'
+              || (m === 'break'  && p.failures)
+              || (m === 'scale'  && p.scale)
+              || (m === 'versus' && p.versus);
+        b.hidden = !ok;
+      });
+
+      setMode('flow');
     }
 
     function animate() {
       for (var i = 0; i < packets.length; i++) {
         var pk = packets[i];
-        // Frozen packets on dimmed edges would read as traffic that isn't there.
-        if (pk.dot.classList.contains('cold')) continue;
+        var cl = pk.dot.classList;
+        if (cl.contains('cold') || cl.contains('severed')) continue;
         pk.t += pk.speed;
         if (pk.t > 1) pk.t = 0;
         try {
@@ -639,6 +1039,7 @@
       raf = requestAnimationFrame(animate);
     }
 
+    /* ---------- wiring ---------- */
     $$('.bp-tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
         $$('.bp-tab').forEach(function (t) {
@@ -651,9 +1052,31 @@
       });
     });
 
+    $$('.bp-mode', modeBar).forEach(function (b) {
+      b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
+    });
+
     if (playBtn) {
       playBtn.addEventListener('click', function () {
         if (playTimer) stopPlay(); else startPlay();
+      });
+    }
+
+    var slider = $('#scale-slider');
+    if (slider) {
+      slider.addEventListener('input', function () {
+        renderScale(sliderToRequests(+slider.value));
+      });
+    }
+
+    var sound = $('#bp-sound');
+    if (sound) {
+      sound.addEventListener('click', function () {
+        var on = audio.toggle();
+        sound.classList.toggle('on', on);
+        sound.textContent = on ? '🔊 SOUND ON' : '🔇 SOUND OFF';
+        sound.setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (on) audio.blip(660, 0.08, 'sine', 0.05);
       });
     }
 
