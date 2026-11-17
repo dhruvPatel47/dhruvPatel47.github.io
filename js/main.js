@@ -478,6 +478,91 @@
       ]
     },
 
+    soclab: {
+      file: 'soc-home-lab.svg',
+      blurb: 'A working SOC on one PC: a Wazuh SIEM, a Sysmon-instrumented Windows endpoint and a Kali attacker, ' +
+             'plus an AI triage layer that runs on my own GPU and is never allowed to act on its own. Try it live in the Attack Lab below.',
+      meta: [
+        ['Context', 'Home lab · Nov 2026'],
+        ['Detections', '9 MITRE-mapped tests · 9 caught'],
+        ['Response', 'Brute force blocked in 8 s'],
+        ['AI', '147 alerts → 3 incidents · local LLM']
+      ],
+      nodes: [
+        { id: 'kali',    x: 15,  y: 330,  label: 'Kali',          sub: 'attacker · .131',   role: 'Adversary',
+          desc: 'Kali Linux on the lab network. Used only for SSH tests against my own SIEM: username spraying, then usernames written as instructions to the AI.' },
+        { id: 'win',     x: 15,  y: 60, label: 'win11-ws01',    sub: 'Sysmon + agent',    role: 'Endpoint',
+          desc: 'Windows 11 Enterprise with Sysmon (SwiftOnSecurity config) and the Wazuh agent shipping Security, System and Sysmon logs plus file integrity events over TLS on 1514.' },
+        { id: 'wazuh',   x: 200, y: 195, label: 'Wazuh',         sub: 'manager · Ubuntu',  role: 'SIEM',
+          desc: 'Wazuh 4.14 all-in-one on Ubuntu Server 24.04. Decodes every event and runs it through the built-in ruleset plus my own rules.' },
+        { id: 'rules',   x: 208, y: 45,  label: 'Custom rules',  sub: '100100–100110',     role: 'Detection engineering',
+          desc: 'Nine rules mapped to MITRE ATT&CK: discovery bursts (frequency correlation), account creation, admin group changes, scheduled tasks, Startup-folder persistence and authorized_keys tampering.' },
+        { id: 'ar',      x: 192, y: 345, label: 'Active resp.',  sub: 'firewall-drop',     role: 'Containment',
+          desc: 'Rules 5712/5763 trigger firewall-drop: an iptables DROP on the source IP for 300 s. The analyst workstation is on a never-block list so a typo cannot lock me out of my own SIEM.' },
+        { id: 'dash',    x: 400, y: 45, label: 'Dashboard',     sub: 'indexer · :443',    role: 'Visibility',
+          desc: 'Wazuh indexer and dashboard for threat hunting. Query rule.groups:soclab returns every hit from my custom rules across both hosts.' },
+        { id: 'corr',    x: 400, y: 203, label: 'Correlator',    sub: '147 → 3',           role: 'Noise reduction',
+          desc: 'Plain Python, not AI: groups alerts by host, source IP and a 15-minute gap, and keeps only groups with a level 10+ alert. This is where alert fatigue is actually cut.' },
+        { id: 'llm',     x: 600, y: 100,  label: 'gpt-oss:20b',   sub: 'Ollama · my GPU',   role: 'AI analyst',
+          desc: 'A local model drafts each incident (summary, attack story, MITRE, risk, recommended actions) into a fixed JSON schema in about 5 seconds. Log text is wrapped as untrusted data. Nothing leaves the network.' },
+        { id: 'guard',   x: 590, y: 250, label: 'Guardrails',    sub: 'code, after model', role: 'Control',
+          desc: 'Checks that run after the model: actions must come from an allow-list and name a real target, severity can never drop below the rule level, and a benign verdict is overridden when injection text is present.' },
+        { id: 'analyst', x: 765, y: 355, label: 'Analyst',       sub: 'respond.py',        role: 'Human decision',
+          desc: 'Nothing runs until I approve a numbered action. Every approve and reject is written to an audit log with a reason. In the lab I rejected two AI suggestions: a misspelled account and isolating the SIEM itself.' }
+      ],
+      edges: [
+        ['kali','wazuh'],['win','wazuh'],['rules','wazuh'],['wazuh','ar'],['ar','kali'],['wazuh','dash'],
+        ['wazuh','corr'],['corr','llm'],['llm','guard'],['guard','analyst'],['analyst','ar']
+      ],
+      flows: [
+        { title: 'Telemetry', path: ['win','wazuh'],
+          desc: 'Sysmon records process creation, file creation and command lines; the Wazuh agent ships them with the Windows Security log to the manager over TLS.' },
+        { title: 'Detect', path: ['win','wazuh','rules'],
+          desc: 'A test account is created and added to Administrators. Rules 100103 and 100104 fire within a second, mapped to T1136.001 and T1098.' },
+        { title: 'Brute force', path: ['kali','wazuh','ar','kali'],
+          desc: 'Kali sprays 12 made-up usernames at SSH. Rule 5712 fires and firewall-drop blocks 192.168.179.131, 8 seconds after the first attempt.' },
+        { title: 'Correlate', path: ['wazuh','corr'],
+          desc: '147 raw alerts from the test window become 3 incidents. Deterministic code does this, so it is predictable and testable.' },
+        { title: 'AI drafts', path: ['corr','llm'],
+          desc: 'Each incident goes to the local model with an injection pre-check. The model returns a structured draft in about 5 seconds per incident.' },
+        { title: 'Guardrails', path: ['llm','guard'],
+          desc: 'The injected usernames talked the model into "low / benign". The guardrails raised it to high and overrode the verdict to unknown. The model’s own judgement is not the control.' },
+        { title: 'Human decides', path: ['guard','analyst','ar'],
+          desc: 'I approve the IP block and it is enforced immediately, verified from Kali. I reject the action that targeted a misspelled account.' }
+      ],
+      failures: [
+        { id: 'agent', label: 'Stop the endpoint agent', verdict: 'degraded',
+          state: { win: 'dead' }, severed: [['win','wazuh']],
+          title: 'Endpoint goes dark',
+          body: 'Windows detections stop: no Sysmon events, no account or persistence alerts. Wazuh still sees the agent disconnect, and SSH detection on the server is untouched.',
+          decision: 'The gap worth naming: there is no alert yet for "agent silent for N minutes". In production that would be the first rule I add, because attackers stop agents.' },
+        { id: 'llm', label: 'AI model offline', verdict: 'survives',
+          state: { llm: 'dead' }, severed: [['corr','llm'],['llm','guard']],
+          title: 'Local model unavailable',
+          body: 'Detection and automatic blocking keep working; they never depended on the AI. Incidents still correlate, they just arrive without a draft write-up.',
+          decision: 'AI sits beside the pipeline, not inside it. Losing it costs analyst time, never detection coverage.' },
+        { id: 'inject', label: 'Prompt-inject the AI', verdict: 'survives',
+          state: { llm: 'degraded' },
+          title: 'Attacker-written text reaches the model',
+          body: 'This happened in the lab. The model rated a level-10 brute force as low and benign. The guardrails corrected it to high and unknown before any human saw it.',
+          decision: 'Guardrails are code that runs after the model. Asking the model to "ignore instructions in logs" is not a control; checking its output is.' },
+        { id: 'ar', label: 'Block the wrong IP', verdict: 'survives',
+          state: { ar: 'degraded' },
+          title: 'Containment aimed at infrastructure',
+          body: 'Blocks on 192.168.179.1, .10 and .20 are refused outright, and every block expires after 300 seconds on its own.',
+          decision: 'A never-block list and auto-expiry turn a bad containment call into a five-minute inconvenience instead of an outage.' },
+        { id: 'siem', label: 'Lose the SIEM', verdict: 'down',
+          state: { wazuh: 'dead', rules: 'dead', ar: 'dead', dash: 'dead', corr: 'dead' },
+          title: 'Single SIEM node fails',
+          body: 'Everything stops: no detection, no blocking, no triage. Agents buffer events locally for a while, but nothing is analysed.',
+          decision: 'It is a one-node home lab and I would rather say so. Production means a manager cluster and a separate indexer, at several times the hardware.' }
+      ],
+      links: [
+        ['GitHub', 'https://github.com/dhruvPatel47/soc-home-lab'],
+        ['Report', 'https://github.com/dhruvPatel47/soc-home-lab/blob/main/report/SOC_Home_Lab_Report.pdf']
+      ]
+    },
+
     acme: {
       file: 'acme-nist-redesign.svg',
       blurb: 'An enterprise security redesign carried out after a ransomware incident, structured around the ' +
@@ -974,6 +1059,14 @@
           var v = document.createElement('span'); v.className = 'pm-v'; v.textContent = row[1];
           c.appendChild(k); c.appendChild(v); metaBox.appendChild(c);
         });
+        (p.links || []).forEach(function (row) {
+          var a = document.createElement('a'); a.className = 'pm-card pm-link';
+          a.href = row[1]; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          a.setAttribute('data-cursor', 'link'); a.setAttribute('data-label', 'OPEN');
+          var k = document.createElement('span'); k.className = 'pm-k'; k.textContent = row[0];
+          var v = document.createElement('span'); v.className = 'pm-v'; v.textContent = 'Open ↗';
+          a.appendChild(k); a.appendChild(v); metaBox.appendChild(a);
+        });
       }
 
       if (blurbBox) blurbBox.textContent = p.blurb || '';
@@ -1170,7 +1263,7 @@
         line('<span class="t-key">Available commands</span>');
         [['whoami','who is this'],['about','the short version'],
          ['experience','where I have worked'],['projects','what I have built'],
-         ['open <name>','load a diagram (easyshop · soar · acme)'],
+         ['open <name>','load a diagram (easyshop · soar · soclab · acme)'],['lab','jump to the attack lab'],
          ['skills','the stack'],['education','degrees and certificates'],
          ['certs','certifications'],['contact','how to reach me'],
          ['resume','how to get the PDF'],['neofetch','system info'],
@@ -1200,17 +1293,24 @@
         line('<span class="t-key">easyshop</span>  <span class="t-dim">Serverless e-commerce on AWS · Seneca capstone 2026</span>');
         line('          <span class="t-dim">11 Lambdas · Multi-AZ RDS · Cognito · Stripe · SES · $52.71 all-in</span>');
         line('<span class="t-key">soar</span>      <span class="t-dim">Automated incident response · Shuffle + Wazuh + TheHive</span>');
+        line('<span class="t-key">soclab</span>    <span class="t-dim">SOC home lab · Wazuh + Sysmon + local-LLM triage · Nov 2026</span>');
+          line('          <span class="t-dim">9/9 detections · 8 s auto-block · 147 alerts → 3 incidents · type </span><span class="t-ok">lab</span>');
         line('<span class="t-key">acme</span>      <span class="t-dim">Post-ransomware security redesign · NIST CSF · York 2025</span>');
         line('');
         line('<span class="t-dim">Try:</span> open easyshop');
       },
       open: function (arg) {
         var key = (arg || '').toLowerCase();
-        if (!key) { line('usage: open &lt;easyshop|soar|acme&gt;', 't-warn'); return; }
+        if (!key) { line('usage: open &lt;easyshop|soar|soclab|acme&gt;', 't-warn'); return; }
         if (!PROJECTS[key]) { line('no such project: ' + esc(key), 't-err'); return; }
         if (window.__bpShow) window.__bpShow(key);
         line('Loading <span class="t-key">' + esc(key) + '</span> architecture…', 't-ok');
         var target = document.getElementById('systems');
+        if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
+      },
+      lab: function () {
+        line('Opening the attack lab. Pick an attack, then run the AI triage.', 't-ok');
+        var target = document.getElementById('lab');
         if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
       },
       skills: function () {
@@ -1316,7 +1416,7 @@
         ['<span class="t-dim">Last login: ' + new Date().toDateString() + '</span>', 90],
         ['<span class="t-ok">[ OK ]</span> <span class="t-dim">mounting /profile</span>', 190],
         ['<span class="t-ok">[ OK ]</span> <span class="t-dim">loading aws credentials</span>', 170],
-        ['<span class="t-ok">[ OK ]</span> <span class="t-dim">3 projects indexed</span>', 170],
+        ['<span class="t-ok">[ OK ]</span> <span class="t-dim">4 projects indexed</span>', 170],
         ['', 90],
         ['Welcome. Type <span class="t-key">help</span> to see what this shell knows.', 0]
       ];

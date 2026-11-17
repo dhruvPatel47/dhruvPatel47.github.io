@@ -47,9 +47,10 @@
     <a href="#about" data-nav data-cursor="link"><span>01</span>INDEX</a>
     <a href="#work" data-nav data-cursor="link"><span>02</span>WORK</a>
     <a href="#systems" data-nav data-cursor="link"><span>03</span>SYSTEMS</a>
-    <a href="#shell" data-nav data-cursor="link"><span>04</span>SHELL</a>
-    <a href="#stack" data-nav data-cursor="link"><span>05</span>STACK</a>
-    <a href="#contact" data-nav data-cursor="link"><span>06</span>CONTACT</a>
+    <a href="#lab" data-nav data-cursor="link"><span>04</span>LAB</a>
+    <a href="#shell" data-nav data-cursor="link"><span>05</span>SHELL</a>
+    <a href="#stack" data-nav data-cursor="link"><span>06</span>STACK</a>
+    <a href="#contact" data-nav data-cursor="link"><span>07</span>CONTACT</a>
   </nav>
   <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
     <span></span><span></span>
@@ -207,6 +208,7 @@
     <div class="bp-switch" role="tablist" aria-label="Select project">
       <button role="tab" class="bp-tab active" data-proj="easyshop" aria-selected="true" data-cursor="link" data-label="OPEN">EASYSHOP</button>
       <button role="tab" class="bp-tab" data-proj="soar" aria-selected="false" data-cursor="link" data-label="OPEN">SOAR PIPELINE</button>
+      <button role="tab" class="bp-tab" data-proj="soclab" aria-selected="false" data-cursor="link" data-label="OPEN">SOC HOME LAB</button>
       <button role="tab" class="bp-tab" data-proj="acme" aria-selected="false" data-cursor="link" data-label="OPEN">ACME REDESIGN</button>
     </div>
 
@@ -285,11 +287,76 @@
   </div>
 </section>
 
+<!-- ============ ATTACK LAB ============ -->
+<section class="section" id="lab">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-idx">04</span>
+      <h3 class="sec-title" data-scramble>ATTACK LAB</h3>
+      <span class="sec-meta">SOC HOME LAB · WAZUH + LOCAL AI</span>
+    </div>
+
+    <p class="sec-lead">
+      I built a small SOC at home, then attacked it, and then attacked the AI that reads its logs.
+      Launch the same attacks here and watch my detections fire, the attacker get blocked, and the AI
+      triage the result. Everything replays the real alerts from my lab, rule for rule.
+    </p>
+
+    <div class="panel lab" aria-label="Attack lab console">
+      <div class="panel-bar">
+        <span class="pb-dot" aria-hidden="true"></span>
+        <span class="pb-file">soc-console — wazuh-ubuntu 192.168.179.10</span>
+        <span class="pb-live">● REPLAY</span>
+      </div>
+
+      <div class="lab-grid">
+        <div class="lab-col lab-left">
+          <span class="lab-h">ATTACKER · KALI / WIN11</span>
+          <div class="lab-attacks" id="lab-attacks" role="group" aria-label="Attacks"></div>
+          <button type="button" class="lab-reset" id="lab-reset" data-cursor="link">↺ RESET LAB</button>
+        </div>
+
+        <div class="lab-col lab-mid">
+          <div class="lab-stats">
+            <div class="lab-stat"><span class="lab-stat-k">ALERTS</span><b class="lab-stat-v" id="lab-n-alerts">0</b></div>
+            <div class="lab-stat"><span class="lab-stat-k">LEVEL ≥ 10</span><b class="lab-stat-v" id="lab-n-high">0</b></div>
+            <div class="lab-stat"><span class="lab-stat-k">DETECTED IN (LAB)</span><b class="lab-stat-v" id="lab-mttd">—</b></div>
+            <div class="lab-stat"><span class="lab-stat-k">KALI 192.168.179.131</span><b class="lab-stat-v ok" id="lab-kali">REACHABLE</b></div>
+          </div>
+          <div class="lab-story" id="lab-story" aria-live="polite">Pick an attack. Each one replays what really happened in my lab, rule for rule.</div>
+          <div class="lab-feed" id="lab-feed" role="log" aria-label="Wazuh alerts">
+            <p class="lab-empty">No alerts yet. Pick an attack on the left.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="lab-ai-bar">
+        <span class="lab-h">AI TRIAGE · gpt-oss:20b ON MY GPU · NO DATA LEAVES THE LAB</span>
+        <div class="lab-ai-btns">
+          <button type="button" class="lab-guard" id="lab-guard" aria-pressed="true" data-cursor="link" data-label="TOGGLE">🛡 GUARDRAILS ON</button>
+          <button type="button" class="lab-triage" id="lab-triage" disabled data-cursor="link" data-label="RUN">▶ RUN AI TRIAGE</button>
+        </div>
+      </div>
+      <div class="lab-ai" id="lab-ai" aria-live="polite">
+        <p class="lab-empty">Run one or more attacks, then hand the alerts to the AI.</p>
+      </div>
+    </div>
+
+    <div class="proj-meta lab-meta">
+      <div class="pm-card"><span class="pm-k">Detections</span><span class="pm-v">9 MITRE-mapped tests, 9 caught</span></div>
+      <div class="pm-card"><span class="pm-k">Response</span><span class="pm-v">Attacker blocked 8 s after first try</span></div>
+      <div class="pm-card"><span class="pm-k">AI triage</span><span class="pm-v">147 alerts → 3 incidents, ~5 s each</span></div>
+      <a class="pm-card pm-link" href="https://github.com/dhruvPatel47/soc-home-lab" target="_blank" rel="noopener noreferrer" data-cursor="link" data-label="CODE"><span class="pm-k">GitHub</span><span class="pm-v">soc-home-lab ↗</span></a>
+      <a class="pm-card pm-link" href="https://github.com/dhruvPatel47/soc-home-lab/blob/main/report/SOC_Home_Lab_Report.pdf" target="_blank" rel="noopener noreferrer" data-cursor="link" data-label="READ"><span class="pm-k">Full report</span><span class="pm-v">10-page PDF ↗</span></a>
+    </div>
+  </div>
+</section>
+
 <!-- ============ SHELL ============ -->
 <section class="section" id="shell">
   <div class="wrap">
     <div class="sec-head">
-      <span class="sec-idx">04</span>
+      <span class="sec-idx">05</span>
       <h3 class="sec-title" data-scramble>SHELL</h3>
       <span class="sec-meta">TYPE `HELP`</span>
     </div>
@@ -315,7 +382,7 @@
 <section class="section" id="stack">
   <div class="wrap">
     <div class="sec-head">
-      <span class="sec-idx">05</span>
+      <span class="sec-idx">06</span>
       <h3 class="sec-title" data-scramble>STACK</h3>
       <span class="sec-meta">TOOLS / FRAMEWORKS / CERTS</span>
     </div>
@@ -335,7 +402,7 @@
 <section class="section contact" id="contact">
   <div class="wrap">
     <div class="sec-head">
-      <span class="sec-idx">06</span>
+      <span class="sec-idx">07</span>
       <h3 class="sec-title" data-scramble>CONTACT</h3>
       <span class="sec-meta">OPEN TO WORK</span>
     </div>
@@ -390,5 +457,6 @@
   }
 </script>
 <script src="js/main.js"></script>
+<script src="js/soclab.js"></script>
 </body>
 </html>

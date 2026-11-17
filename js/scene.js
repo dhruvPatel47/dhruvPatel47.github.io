@@ -14,6 +14,7 @@ const STATIONS = [
   { id: 'about',   bg: 0x04080a, fog: 0x04080a, accent: 0x7dffd4 },
   { id: 'work',    bg: 0x0a0604, fog: 0x0a0604, accent: 0xffb020 },
   { id: 'systems', bg: 0x03070d, fog: 0x03070d, accent: 0x38bdf8 },
+  { id: 'lab',     bg: 0x0c0405, fog: 0x0c0405, accent: 0xff4d5e },
   { id: 'shell',   bg: 0x050505, fog: 0x050505, accent: 0xccff00 },
   { id: 'stack',   bg: 0x08040c, fog: 0x08040c, accent: 0xc084fc },
   { id: 'contact', bg: 0x050505, fog: 0x050505, accent: 0xccff00 }
@@ -191,6 +192,34 @@ export function initScene({ canvas, reduceMotion }) {
     return g;
   }
 
+  /* lab — a SOC radar: range rings, spokes and a few hostile contacts */
+  function buildLab() {
+    const g = new THREE.Group();
+    const RED = 0xff4d5e;
+    for (let i = 1; i <= 4; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(i * 5, 0.06, 3, 96),
+        new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.5 - i * 0.08 })
+      );
+      g.add(ring);
+    }
+    const spokeMat = new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.25 });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0), new THREE.Vector3(Math.cos(a) * 20, Math.sin(a) * 20, 0)
+      ]);
+      g.add(new THREE.Line(geo, spokeMat));
+    }
+    const dotGeo = new THREE.OctahedronGeometry(0.7, 0);
+    [[7, 0.6], [12, 2.1], [16, 3.9], [9, 4.8], [18, 5.6]].forEach(([r, a], i) => {
+      const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: i === 4 ? 0xc084fc : RED, wireframe: true }));
+      dot.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+      g.add(dot);
+    });
+    return g;
+  }
+
   /* shell — a wall of cubes that ripples */
   function buildShell() {
     const g = new THREE.Group();
@@ -254,7 +283,7 @@ export function initScene({ canvas, reduceMotion }) {
 
   const BUILDERS = {
     hero: buildHero, about: buildAbout, work: buildWork,
-    systems: buildSystems, shell: buildShell, stack: buildStack, contact: buildContact
+    systems: buildSystems, lab: buildLab, shell: buildShell, stack: buildStack, contact: buildContact
   };
 
   /* ---------- place each set piece at its section's scroll depth ---------- */
