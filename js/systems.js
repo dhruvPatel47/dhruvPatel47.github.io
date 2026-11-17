@@ -1,5 +1,5 @@
 /* ============================================================
-   Dhruv Patel — portfolio
+   Dhruv Patel — portfolio: architecture blueprints + skills index
    Vanilla JS, no dependencies, no build step.
    ============================================================ */
 (function () {
@@ -8,7 +8,7 @@
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var $  = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
-  var ACID = '#ccff00';
+  var ACID = '#39f3bb';
 
   function debounce(fn, ms) {
     var t;
@@ -18,293 +18,6 @@
       t = setTimeout(function () { fn.apply(c, a); }, ms);
     };
   }
-
-  /* ---------------------------------------------------------
-     1. Preloader
-     --------------------------------------------------------- */
-  function initLoader() {
-    var loader = $('#loader'), num = $('#loader-num'),
-        fill = $('#loader-fill'), status = $('#loader-status');
-    if (!loader) return;
-
-    var steps = ['INITIALISING', 'MOUNTING /PROFILE', 'RESOLVING TOPOLOGY',
-                 'LOADING ARCHITECTURE', 'READY'];
-    var pct = 0;
-
-    function done() {
-      loader.classList.add('done');
-      document.body.classList.remove('is-loading');
-      document.documentElement.classList.add('ready');
-      // Hero type animates in only once the curtain is actually lifting.
-      setTimeout(function () { $$('.hero [data-scramble]').forEach(scramble); }, 120);
-    }
-
-    if (reduceMotion) { done(); return; }
-
-    var timer = setInterval(function () {
-      // Uneven increments read as real work rather than a fake progress bar.
-      pct += Math.random() * 14 + 4;
-      if (pct >= 100) {
-        pct = 100;
-        clearInterval(timer);
-        setTimeout(done, 380);
-      }
-      var p = Math.floor(pct);
-      if (num) num.textContent = p < 10 ? '0' + p : String(p);
-      if (fill) fill.style.width = p + '%';
-      if (status) status.textContent = steps[Math.min(Math.floor(p / 25), steps.length - 1)];
-    }, 130);
-
-    // Never let a stalled timer trap the page.
-    setTimeout(function () { clearInterval(timer); done(); }, 4200);
-  }
-
-  /* ---------------------------------------------------------
-     3b. Fit the giant type edge to edge
-     --------------------------------------------------------- */
-  var scrambling = 0;
-
-  function fitGiant() {
-    // Measuring mid-scramble would size the line to decoding glyphs.
-    if (scrambling > 0) return;
-    $$('.giant').forEach(function (el) {
-      var parent = el.parentElement;
-      if (!parent) return;
-      var avail = parent.clientWidth;
-      if (!avail) return;
-
-      // Measure at a known size, then scale so the line spans the column.
-      // max-width must come off first: at the probe size the line overflows,
-      // and a clamped box reports its clamped width, not the text's real one.
-      el.style.maxWidth = 'none';
-      el.style.fontSize = '100px';
-      var natural = el.getBoundingClientRect().width;
-      el.style.maxWidth = '';
-
-      if (!natural) { el.style.fontSize = ''; return; }
-
-      var size = 100 * (avail / natural);
-      // A short line on an ultrawide monitor would otherwise set type taller
-      // than the screen. Capping costs a little rag on the right; worth it.
-      size = Math.min(size, window.innerHeight * 0.62);
-      // Floor keeps a sub-pixel rounding error from forcing an overflow.
-      el.style.fontSize = Math.floor(size * 100) / 100 + 'px';
-    });
-  }
-
-  function initFit() {
-    // Web fonts change the metrics, so re-fit once they have landed.
-    fitGiant();
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(fitGiant);
-    }
-    window.addEventListener('resize', debounce(fitGiant, 140));
-  }
-
-  /* ---------------------------------------------------------
-     4. Text scramble
-     --------------------------------------------------------- */
-  var GLYPHS = '█▓▒░#@%&$/\\<>[]{}=+*ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-
-  var SCRAMBLE_MS = 700;
-
-  function scramble(el) {
-    if (reduceMotion || el.dataset.done === '1') return;
-    el.dataset.done = '1';
-
-    var final = el.textContent;
-    var len = final.length;
-    if (!len) return;
-
-    // Lock the box first: decoding glyphs are wider than the real ones and
-    // would otherwise reflow the whole line on every frame.
-    var w = el.getBoundingClientRect().width;
-    if (w) el.style.minWidth = w + 'px';
-
-    var starts = [], ends = [];
-    for (var i = 0; i < len; i++) {
-      var s = Math.random() * 0.35;
-      starts.push(s);
-      ends.push(s + 0.25 + Math.random() * 0.4);
-    }
-
-    var settled = false;
-    scrambling++;
-    function settle() {
-      if (settled) return;
-      settled = true;
-      scrambling--;
-      el.textContent = final;
-      el.style.minWidth = '';
-      if (scrambling === 0) fitGiant();
-    }
-
-    var t0 = performance.now();
-    (function frame(now) {
-      if (settled) return;
-      // Driven by wall-clock, not frame count — a throttled tab must never
-      // leave a visitor staring at a garbled name.
-      var p = Math.min(((now || performance.now()) - t0) / SCRAMBLE_MS, 1);
-      if (p >= 1) { settle(); return; }
-
-      var out = '';
-      for (var i = 0; i < len; i++) {
-        var ch = final[i];
-        if (ch === ' ') { out += ' '; continue; }
-        if (p >= ends[i]) out += ch;
-        else if (p >= starts[i]) out += GLYPHS[(Math.random() * GLYPHS.length) | 0];
-        else out += ' ';
-      }
-      el.textContent = out;
-      requestAnimationFrame(frame);
-    })(t0);
-
-    // Hard guarantee independent of requestAnimationFrame.
-    setTimeout(settle, SCRAMBLE_MS + 400);
-  }
-
-  function initScramble() {
-    var targets = $$('[data-scramble]').filter(function (el) { return !el.closest('.hero'); });
-    if (!('IntersectionObserver' in window)) return;
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (!e.isIntersecting) return;
-        scramble(e.target);
-        io.unobserve(e.target);
-      });
-    }, { threshold: 0.5 });
-    targets.forEach(function (el) { io.observe(el); });
-  }
-
-  /* ---------------------------------------------------------
-     5. Ticker
-     --------------------------------------------------------- */
-  function initTicker() {
-    var track = $('#ticker-track');
-    if (!track) return;
-    var items = ['AWS', '✦', 'SERVERLESS', '✦', 'MULTI-AZ', '✦', 'SIEM', '✦', 'MITRE ATT&CK',
-                 '✦', 'NIST CSF', '✦', 'INCIDENT RESPONSE', '✦', 'ZERO TRUST', '✦', 'LAMBDA',
-                 '✦', 'COGNITO', '✦', 'SOC', '✦', 'THREAT HUNTING', '✦', 'ISO 27001', '✦'];
-    // Rendered twice so the -50% keyframe loops seamlessly.
-    var html = '';
-    for (var pass = 0; pass < 2; pass++) {
-      items.forEach(function (s) { html += '<span>' + s + '</span>'; });
-    }
-    track.innerHTML = html;
-  }
-
-  /* ---------------------------------------------------------
-     6. Cursor, nav, clock, reveals, counters
-     --------------------------------------------------------- */
-  function initChrome() {
-    var cur = $('#cursor');
-    if (cur && !reduceMotion && window.matchMedia('(pointer:fine)').matches) {
-      document.body.classList.add('has-cursor');
-      var gx = 0, gy = 0, cx = 0, cy = 0;
-      window.addEventListener('mousemove', function (e) { gx = e.clientX; gy = e.clientY; });
-      (function follow() {
-        cx += (gx - cx) * 0.16; cy += (gy - cy) * 0.16;
-        cur.style.transform = 'translate(' + cx + 'px,' + cy + 'px)';
-        requestAnimationFrame(follow);
-      })();
-
-      var curLabel = $('#cursor-label');
-      document.addEventListener('mouseover', function (e) {
-        var t = e.target.closest('[data-cursor="link"], a, button, input');
-        cur.classList.toggle('on', !!t);
-        if (curLabel) {
-          // Nearest ancestor carrying a label wins, so a link inside a
-          // labelled card still shows the card's verb.
-          var labelled = e.target.closest('[data-label]');
-          curLabel.textContent = (t && labelled) ? labelled.getAttribute('data-label') : '';
-        }
-      });
-    }
-
-    var toggle = $('#nav-toggle'), links = $('.nav-links');
-    if (toggle && links) {
-      toggle.addEventListener('click', function () {
-        var open = links.classList.toggle('open');
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-      links.addEventListener('click', function (e) {
-        if (e.target.closest('a')) {
-          links.classList.remove('open');
-          toggle.setAttribute('aria-expanded', 'false');
-        }
-      });
-    }
-
-    var clock = $('#clock');
-    if (clock) {
-      (function tick() {
-        // Toronto time, since that's where he is and where the job is.
-        var s = new Date().toLocaleTimeString('en-CA', {
-          hour12: false, timeZone: 'America/Toronto'
-        });
-        clock.textContent = s + ' EST';
-        setTimeout(tick, 1000);
-      })();
-    }
-
-    var yr = $('#year');
-    if (yr) yr.textContent = new Date().getFullYear();
-  }
-
-  function initScroll() {
-    // Everything inside a section reveals on scroll except the hero,
-    // which the preloader hands over already visible.
-    $$('.section .wrap > *, .room-content > *, .ticker').forEach(function (el) {
-      el.classList.add('rv');
-    });
-    var revealEls = $$('.rv');
-
-    if ('IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e, i) {
-          if (!e.isIntersecting) return;
-          setTimeout(function () { e.target.classList.add('in'); }, i * 65);
-          io.unobserve(e.target);
-        });
-      }, { threshold: 0.08, rootMargin: '0px 0px -50px 0px' });
-      revealEls.forEach(function (el) { io.observe(el); });
-    } else {
-      revealEls.forEach(function (el) { el.classList.add('in'); });
-    }
-
-    var counters = $$('.counter'), done = [];
-    function runCounters() {
-      counters.forEach(function (c) {
-        if (done.indexOf(c) > -1) return;
-        if (c.getBoundingClientRect().top > window.innerHeight - 40) return;
-        done.push(c);
-        var target = parseInt(c.getAttribute('data-target'), 10) || 0;
-        if (reduceMotion) { c.textContent = target; return; }
-        var start = performance.now(), dur = 1600;
-        (function step(now) {
-          var p = Math.min((now - start) / dur, 1);
-          var eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
-          c.textContent = Math.round(target * eased);
-          if (p < 1) requestAnimationFrame(step);
-        })(start);
-      });
-    }
-
-    var sections = $$('main section[id]');
-    var navLinks = $$('.nav-links a[data-nav]');
-    function onScroll() {
-      var y = window.scrollY || window.pageYOffset;
-      var current = '';
-      sections.forEach(function (s) { if (y >= s.offsetTop - 160) current = s.id; });
-      navLinks.forEach(function (a) {
-        a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-      });
-      runCounters();
-    }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-  }
-
   /* ---------------------------------------------------------
      7. Project data
      --------------------------------------------------------- */
@@ -1026,7 +739,7 @@
                           'aria-label': n.label + ' — ' + n.role });
         g.appendChild(el('rect', {
           x: n.x, y: n.y, width: NODE_W, height: NODE_H,
-          fill: 'rgba(10,10,10,0.92)', stroke: 'rgba(204,255,0,0.3)', 'stroke-width': 1.2
+          fill: 'rgba(10,10,10,0.92)', stroke: 'rgba(57,243,187,0.3)', 'stroke-width': 1.2
         }));
         var lbl = el('text', { x: n.x + NODE_W / 2, y: n.y + 22, 'text-anchor': 'middle', class: 'n-label' });
         lbl.textContent = n.label;
@@ -1137,7 +850,7 @@
           pk.dot.setAttribute('cy', pt.y);
         } catch (e) { /* path not measurable yet */ }
       }
-      raf = requestAnimationFrame(animate);
+      if (raf) raf = requestAnimationFrame(animate);
     }
 
     /* ---------- wiring ---------- */
@@ -1183,11 +896,21 @@
 
     render('easyshop');
     if (!reduceMotion) {
-      animate();
-      document.addEventListener('visibilitychange', function () {
-        if (document.hidden) { cancelAnimationFrame(raf); raf = null; }
-        else if (!raf) { raf = requestAnimationFrame(animate); }
-      });
+      // Packets only move while the diagram is on screen and the tab is
+      // visible; off screen the loop costs nothing.
+      var onScreen = false;
+      function wake() {
+        var want = onScreen && !document.hidden;
+        if (want && !raf) raf = requestAnimationFrame(animate);
+        if (!want && raf) { cancelAnimationFrame(raf); raf = null; }
+      }
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (es) {
+          onScreen = es[0].isIntersecting; wake();
+        }, { rootMargin: '120px' }).observe(stage || svg);
+      } else { onScreen = true; }
+      document.addEventListener('visibilitychange', wake);
+      wake();
     }
 
     window.__bpShow = function (key) {
@@ -1235,225 +958,7 @@
     });
   }
 
-  /* ---------------------------------------------------------
-     10. Terminal
-     --------------------------------------------------------- */
-  function initTerminal() {
-    var body = $('#term-body'), input = $('#term-input');
-    if (!body || !input) return;
-
-    var history = [], hIdx = -1;
-
-    function line(html, cls) {
-      var d = document.createElement('div');
-      d.className = 'term-line' + (cls ? ' ' + cls : '');
-      d.innerHTML = html;
-      body.appendChild(d);
-      body.scrollTop = body.scrollHeight;
-      return d;
-    }
-    function esc(s) {
-      return String(s).replace(/[&<>"']/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-      });
-    }
-
-    var COMMANDS = {
-      help: function () {
-        line('<span class="t-key">Available commands</span>');
-        [['whoami','who is this'],['about','the short version'],
-         ['experience','where I have worked'],['projects','what I have built'],
-         ['open <name>','load a diagram (easyshop · soar · soclab · acme)'],['lab','jump to the attack lab'],
-         ['skills','the stack'],['education','degrees and certificates'],
-         ['certs','certifications'],['contact','how to reach me'],
-         ['resume','how to get the PDF'],['neofetch','system info'],
-         ['ls','list sections'],['clear','wipe the screen']]
-          .forEach(function (c) {
-            line('  <span class="t-key">' + esc(c[0]) + '</span>'
-               + '<span class="t-dim">' + ' '.repeat(Math.max(1, 16 - c[0].length)) + esc(c[1]) + '</span>');
-          });
-      },
-      whoami: function () {
-        line('<span class="t-ok">Dhruv Patel</span> — cloud &amp; security engineer, Toronto ON');
-        line('<span class="t-dim">Authorized to work in Canada. Open to cloud and security roles.</span>');
-      },
-      about: function () {
-        line('Started in a SOC writing SIEM correlation rules. Moved to L1 support,');
-        line('where I learned most outages are configuration, not code. Now I build');
-        line('on AWS — serverless, multi-AZ, least privilege, security designed in.');
-      },
-      experience: function () {
-        line('<span class="t-key">Asite Solutions</span> <span class="t-dim">— Technical Support Engineer L1 · Oct 2024–Mar 2026</span>');
-        line('  SaaS troubleshooting, SSO/MFA, SLA compliance, KB authoring.');
-        line('');
-        line('<span class="t-key">Heritage Cyber World LLP</span> <span class="t-dim">— SOC Analyst · Jan 2023–Jun 2024</span>');
-        line('  <span class="t-ok">-35%</span> false positives via 8+ correlation rules, <span class="t-ok">-40%</span> triage time.');
-      },
-      projects: function () {
-        line('<span class="t-key">easyshop</span>  <span class="t-dim">Serverless e-commerce on AWS · Seneca capstone 2026</span>');
-        line('          <span class="t-dim">11 Lambdas · Multi-AZ RDS · Cognito · Stripe · SES · $52.71 all-in</span>');
-        line('<span class="t-key">soar</span>      <span class="t-dim">Automated incident response · Shuffle + Wazuh + TheHive</span>');
-        line('<span class="t-key">soclab</span>    <span class="t-dim">SOC home lab · Wazuh + Sysmon + local-LLM triage · Nov 2026</span>');
-          line('          <span class="t-dim">9/9 detections · 8 s auto-block · 147 alerts → 3 incidents · type </span><span class="t-ok">lab</span>');
-        line('<span class="t-key">acme</span>      <span class="t-dim">Post-ransomware security redesign · NIST CSF · York 2025</span>');
-        line('');
-        line('<span class="t-dim">Try:</span> open easyshop');
-      },
-      open: function (arg) {
-        var key = (arg || '').toLowerCase();
-        if (!key) { line('usage: open &lt;easyshop|soar|soclab|acme&gt;', 't-warn'); return; }
-        if (!PROJECTS[key]) { line('no such project: ' + esc(key), 't-err'); return; }
-        if (window.__bpShow) window.__bpShow(key);
-        line('Loading <span class="t-key">' + esc(key) + '</span> architecture…', 't-ok');
-        var target = document.getElementById('systems');
-        if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
-      },
-      lab: function () {
-        line('Opening the attack lab. Pick an attack, then run the AI triage.', 't-ok');
-        var target = document.getElementById('lab');
-        if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
-      },
-      skills: function () {
-        SKILLS.forEach(function (g) {
-          line('<span class="t-key">' + esc(g.title) + '</span>');
-          line('  <span class="t-dim">' + esc(g.tags.join(' · ')) + '</span>');
-        });
-      },
-      education: function () {
-        line('<span class="t-key">Seneca Polytechnic</span> <span class="t-dim">· PG Cert, Cloud Architecture &amp; Automation · 2025–2026</span>');
-        line('<span class="t-key">York University</span>    <span class="t-dim">· PG Dip, Cybersecurity Operations · 2024–2025</span>');
-        line('<span class="t-key">Ganpat University</span>  <span class="t-dim">· B.Tech CSE (Cybersecurity) · 2020–2024</span>');
-      },
-      certs: function () {
-        line('<span class="t-ok">✓</span> AWS Certified Cloud Practitioner <span class="t-dim">(2026)</span>');
-        line('<span class="t-ok">✓</span> IBM IT System Log Analyzer <span class="t-dim">(2024)</span>');
-        line('<span class="t-ok">✓</span> Skills Ontario Cybersecurity Competition <span class="t-dim">(2026)</span>');
-        line('<span class="t-dim">  labs: Amazon EKS · Azure P2S VPN · IAM hardening · AWS security architecture</span>');
-      },
-      contact: function () {
-        line('<span class="t-key">email</span>     <a href="mailto:Dhruv123.dp47@gmail.com">Dhruv123.dp47@gmail.com</a>');
-        line('<span class="t-key">linkedin</span>  <a href="https://linkedin.com/in/patel-dhruv-50455b1b9" target="_blank" rel="noopener">in/patel-dhruv-50455b1b9</a>');
-        line('<span class="t-key">location</span>  Toronto, ON <span class="t-dim">(GTA or remote in Canada)</span>');
-      },
-      resume: function () {
-        line('Email me and I will send the PDF tailored to the role.', 't-dim');
-        line('<a href="mailto:Dhruv123.dp47@gmail.com?subject=Resume%20request">Dhruv123.dp47@gmail.com</a>');
-      },
-      neofetch: function () {
-        var rows = [
-          ['OS',       'Cloud Architecture & Automation (Seneca)'],
-          ['Kernel',   'Cybersecurity Operations (York)'],
-          ['Shell',    'bash · PowerShell'],
-          ['Cloud',    'AWS · Azure · GCP fundamentals'],
-          ['Uptime',   '3+ years'],
-          ['Location', 'Toronto, ON'],
-          ['Status',   'open to work']
-        ];
-        line('<span class="t-key">      ___      </span>  <span class="t-ok">dhruv@portfolio</span>');
-        line('<span class="t-key">     /   \\     </span>  <span class="t-dim">───────────────</span>');
-        rows.forEach(function (r, i) {
-          var art = ['    | o o |    ','    |  ^  |    ','     \\ ~ /     ','    /`---`\\    ','   /       \\   ','  |  aws    |  ','   \\_______/   '][i] || '               ';
-          line('<span class="t-key">' + esc(art) + '</span>  <span class="t-key">' + r[0] + '</span><span class="t-dim">: ' + esc(r[1]) + '</span>');
-        });
-      },
-      ls: function () {
-        line('<span class="t-key">index/  work/  systems/  shell/  stack/  contact/</span>');
-      },
-      clear: function () { body.innerHTML = ''; },
-      sudo: function () {
-        line('Nice try. <span class="t-dim">This incident has been logged. (It has not.)</span>', 't-warn');
-      },
-      exit: function () { line('There is no exit. Scroll up instead.', 't-dim'); },
-      date: function () { line(new Date().toString(), 't-dim'); }
-    };
-
-    function run(raw) {
-      var trimmed = raw.trim();
-      line('<span class="t-ok">dhruv@portfolio</span><span class="t-dim">:~$</span> <span class="t-cmd">' + esc(trimmed) + '</span>');
-      if (!trimmed) return;
-      history.unshift(trimmed); hIdx = -1;
-
-      var parts = trimmed.split(/\s+/);
-      var cmd = parts[0].toLowerCase();
-      var arg = parts.slice(1).join(' ');
-
-      if (cmd === 'cat' || cmd === 'cd') { line(cmd + ': try a bare section name, or `help`', 't-dim'); return; }
-      if (COMMANDS[cmd]) { COMMANDS[cmd](arg); }
-      else {
-        line('command not found: ' + esc(cmd), 't-err');
-        line('Type <span class="t-key">help</span> for the list.', 't-dim');
-      }
-      line('');
-    }
-
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { run(input.value); input.value = ''; }
-      else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (hIdx < history.length - 1) { hIdx++; input.value = history[hIdx]; }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (hIdx > 0) { hIdx--; input.value = history[hIdx]; }
-        else { hIdx = -1; input.value = ''; }
-      } else if (e.key === 'Tab') {
-        e.preventDefault();
-        var v = input.value.trim().toLowerCase();
-        if (!v) return;
-        var match = Object.keys(COMMANDS).filter(function (k) { return k.indexOf(v) === 0; });
-        if (match.length === 1) input.value = match[0] + ' ';
-      }
-    });
-
-    $('#term').addEventListener('click', function (e) {
-      if (e.target.tagName !== 'A') input.focus();
-    });
-
-    var booted = false;
-    function boot() {
-      if (booted) return;
-      booted = true;
-      var seq = [
-        ['<span class="t-dim">Last login: ' + new Date().toDateString() + '</span>', 90],
-        ['<span class="t-ok">[ OK ]</span> <span class="t-dim">mounting /profile</span>', 190],
-        ['<span class="t-ok">[ OK ]</span> <span class="t-dim">loading aws credentials</span>', 170],
-        ['<span class="t-ok">[ OK ]</span> <span class="t-dim">4 projects indexed</span>', 170],
-        ['', 90],
-        ['Welcome. Type <span class="t-key">help</span> to see what this shell knows.', 0]
-      ];
-      var i = 0;
-      (function next() {
-        if (i >= seq.length) { line(''); return; }
-        line(seq[i][0]);
-        var d = reduceMotion ? 0 : seq[i][1];
-        i++;
-        setTimeout(next, d);
-      })();
-    }
-
-    if ('IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) { if (e.isIntersecting) { boot(); io.disconnect(); } });
-      }, { threshold: 0.25 });
-      io.observe($('#shell'));
-    } else { boot(); }
-  }
-
-  /* ---------------------------------------------------------
-     boot
-     --------------------------------------------------------- */
-  function init() {
-    initLoader();
-    initFit();
-    initTicker();
-    initStack();
-    initBlueprint();
-    initTerminal();
-    initChrome();
-    initScroll();
-    initScramble();
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else { init(); }
+  function init() { initStack(); initBlueprint(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();

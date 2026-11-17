@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 · Honeypot · Dhruv Patel</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#04060a">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2304060a'/><circle cx='50' cy='50' r='30' fill='none' stroke='%23ff3b4e' stroke-width='8'/><circle cx='50' cy='50' r='9' fill='%23ff3b4e'/></svg>">
+<style>
+  :root{ --ink:#04060a; --acid:#39f3bb; --red:#ff3b4e; --paper:#e8eef3; --grey:#9aa6b2; --grey-d:#5d6875; --line:rgba(232,238,243,.1); }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; display:grid; place-items:center; padding:24px 16px; background:var(--ink); color:var(--paper);
+        font:15px/1.6 'JetBrains Mono',ui-monospace,Consolas,monospace; }
+  .box{ width:min(640px,100%); border:1px solid var(--line); border-left:3px solid var(--red); background:#070a0f; }
+  .h{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:10px 16px; border-bottom:1px solid var(--line); font-size:.6rem; letter-spacing:.2em; color:var(--grey-d); }
+  .h b{ color:var(--red); }
+  .in{ padding:22px 16px; }
+  h1{ margin:0 0 12px; font-size:clamp(1.6rem,6vw,2.6rem); line-height:1.05; letter-spacing:-.02em; text-transform:uppercase; }
+  h1 span{ color:var(--red); }
+  p{ margin:0 0 14px; color:var(--grey); font-size:.82rem; }
+  code{ color:var(--paper); background:rgba(232,238,243,.07); padding:1px 6px; overflow-wrap:anywhere; }
+  dl{ display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:0 0 18px; font-size:.72rem; }
+  dt{ color:var(--grey-d); letter-spacing:.14em; font-size:.6rem; padding-top:2px; }
+  dd{ margin:0; overflow-wrap:anywhere; }
+  .rs{ padding:10px 12px; border:1px solid var(--acid); color:var(--acid); font-size:.74rem; margin-bottom:18px; }
+  a.btn{ display:inline-block; padding:12px 16px; background:var(--acid); color:var(--ink); font-weight:700; font-size:.66rem; letter-spacing:.16em; text-decoration:none; margin:0 6px 6px 0; }
+  a.btn.alt{ background:none; color:var(--paper); border:1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="h"><b>● HONEYPOT TRIGGERED</b><span>RULE 100240 · T1595.003 · LEVEL 8</span></div>
+  <div class="in">
+    <h1>Nothing here.<br><span>Except a detection.</span></h1>
+    <p>You asked for <code id="path">this path</code>. It doesn't exist on this site. Attackers probe paths like this one looking for forgotten config files and admin panels, so every miss is served this page and logged.</p>
+    <dl>
+      <dt>REQUESTED</dt><dd id="d-path">—</dd>
+      <dt>TIME</dt><dd id="d-time">—</dd>
+      <dt>CLIENT</dt><dd id="d-ua">—</dd>
+      <dt>VERDICT</dt><dd>Reconnaissance: wordlist path probing</dd>
+    </dl>
+    <div class="rs">↳ Logged to your defense log on the main page. Nothing was sent anywhere: this site has no server.</div>
+    <a class="btn" href="/#rt">SEE YOUR DEFENSE LOG</a>
+    <a class="btn alt" href="/">BACK TO THE INCIDENT</a>
+  </div>
+</div>
+<script>
+(function () {
+  var path = location.pathname + location.search;
+  var now = new Date();
+  var p = function (n) { return (n < 10 ? '0' : '') + n; };
+  var t = p(now.getHours()) + ':' + p(now.getMinutes()) + ':' + p(now.getSeconds());
+  document.getElementById('path').textContent = path;
+  document.getElementById('d-path').textContent = path;
+  document.getElementById('d-time').textContent = now.toLocaleString();
+  document.getElementById('d-ua').textContent = (navigator.userAgent || '').slice(0, 120);
+  try {
+    var log = JSON.parse(localStorage.getItem('dp-rt-log') || '[]');
+    if (!Array.isArray(log)) log = [];
+    log.push({ k: 'honey', t: t, d: path.slice(0, 60) });
+    localStorage.setItem('dp-rt-log', JSON.stringify(log.slice(-60)));
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
